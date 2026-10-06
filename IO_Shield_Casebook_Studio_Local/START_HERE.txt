@@ -1,0 +1,83 @@
+I/O SHIELD CASEBOOK STUDIO — LOCAL v0.1.1
+
+This version runs on your own computer. It needs no ChatGPT account,
+cloud storage, subscription, or npm install. After installing Node.js once,
+the app works offline. Browser assets and spreadsheet libraries are bundled.
+
+WINDOWS
+1. Extract this ZIP into a permanent, writable folder, such as
+   Documents\IO_Shield_Casebook_Studio. Do not run it inside the ZIP.
+2. Install Node.js 24 (or newer) from https://nodejs.org/en/download.
+   Alternatively, place a portable Node.js 24 node.exe in runtime\.
+3. Double-click Start_Casebook_Windows.cmd.
+4. Your default browser opens http://127.0.0.1:8765.
+   If it does not open automatically, paste that address into your browser.
+5. Keep the launcher window open while working. Press Ctrl+C to stop.
+
+MAC / LINUX
+Install Node.js 24 or newer. In a terminal opened in the extracted folder,
+run: node server.mjs --open
+The included .command launcher is also available; macOS may require permission
+to execute a downloaded script. It can be launched from Terminal with:
+sh Start_Casebook_Mac_Linux.command
+
+USING YOUR CASEBOOK
+- Choose Upload casebook and select your Field School Casebook v3 .xlsx.
+- Import occurs locally. The original workbook is retained untouched.
+- Use the forms for cases, sessions, proof, skill claims, and portfolio drafts.
+- Use Excel to download an updated revision.
+- Use Excel + proof to download a ZIP with the workbook, uploaded supporting
+  files, and revision history. Extract the complete bundle together.
+- Open exported Excel files in Excel or LibreOffice to recalculate formulas.
+- Updated revisions are separate files; the original spreadsheet on your
+  computer is not edited in place.
+
+WHERE YOUR DATA LIVES
+The app creates a data\ folder beside server.mjs:
+  data\casebooks.sqlite = imported record data, edits, file metadata, history
+  data\objects\ = original workbooks and uploaded proof files
+Browser cache and localStorage do not hold your authoritative records.
+Closing the browser or restarting the app does not erase saved records.
+
+BACKUP / MOVE TO ANOTHER COMPUTER
+Stop the app, then copy the entire data folder to a secure backup location.
+To migrate, install/extract this app on the other computer and place that
+data folder beside server.mjs before launching. Excel + proof exports provide
+portable document copies; the data folder is the complete workspace backup.
+For an app upgrade, preserve data and replace only the application files.
+The app does not sync with the hosted pilot. To transfer records from there,
+export an updated workbook and upload it here. Proof files must be downloaded
+and reattached locally; cross-app attachment mappings do not migrate yet.
+
+LOCAL OPERATION
+The server listens only on 127.0.0.1. Other computers cannot connect.
+No login is required: this is a personal application for the current computer.
+It makes no outbound network requests. Use your normal OS account permissions,
+disk encryption, and backup controls for access to the data folder.
+Do not expose this version to the internet or treat it as a multi-user server.
+
+CURRENT LIMITS
+- Imports support the supplied v3 workbook layout, not arbitrary Excel files.
+- Up to 20 casebooks, 8 MB per workbook, 10 MB per attachment, and 100 proof
+  files totaling 40 MB per casebook.
+- Entry capacity follows the template's fixed summary ranges: 250 cases,
+  500 sessions, 750 proof records, 1,000 skill claims.
+- T4/T5 hours remain blank. New claims remain pending review.
+- No reviewer invitations, client/vendor inbox, malware scanning, public
+  portfolio hosting, or operational evidence chain-of-custody workflow.
+- Portfolio exports require cleanup confirmation and explicit sharing
+  acknowledgment; they include draft text, not private attachments.
+
+TROUBLESHOOTING
+- If port 8765 is already in use, an app window may already be running.
+  Windows: set CASEBOOK_PORT=8766 then run node server.mjs --open.
+  Mac/Linux: CASEBOOK_PORT=8766 node server.mjs --open.
+- If you cannot write to the app folder, move it to a writable Documents
+  folder. Avoid Program Files and other protected directories.
+- Advanced: set CASEBOOK_DATA_DIR to an absolute folder path to keep records
+  outside the application folder. A fresh path starts an empty workspace.
+
+SOURCE
+Editable source is in source/. The running app uses the bundled server.mjs
+and public/ files. Source edits need a rebuild; full build instructions and
+dependency manifests are included in source/README-BUILD.md.
