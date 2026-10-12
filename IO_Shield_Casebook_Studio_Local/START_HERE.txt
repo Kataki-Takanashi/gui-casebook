@@ -7,15 +7,15 @@ the app works offline. Browser assets and spreadsheet libraries are bundled.
 WINDOWS
 1. Extract this ZIP into a permanent, writable folder, such as
    Documents\IO_Shield_Casebook_Studio. Do not run it inside the ZIP.
-2. Install Node.js 24 (or newer) from https://nodejs.org/en/download.
-   Alternatively, place a portable Node.js 24 node.exe in runtime\.
+2. Install Node.js 22.13 or newer (24 recommended) from https://nodejs.org/en/download.
+   Alternatively, place a portable Node.js 22.13+ node.exe in runtime\.
 3. Double-click Start_Casebook_Windows.cmd.
 4. Your default browser opens http://127.0.0.1:8765 (localhost:8765 also works).
    If it does not open automatically, paste that address into your browser.
 5. Keep the launcher window open while working. Press Ctrl+C to stop.
 
 MAC / LINUX
-Install Node.js 24 or newer. In a terminal opened in the extracted folder,
+Install Node.js 22.13 or newer. In a terminal opened in the extracted folder,
 run: node server.mjs --open
 The included .command launcher is also available; macOS may require permission
 to execute a downloaded script. It can be launched from Terminal with:

@@ -9,7 +9,8 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--ring);outline-offse
 .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
 /* Shell */
-.brand{display:flex;align-items:center;gap:9px;padding:18px 14px 14px;color:var(--foreground)}
+.brand{display:flex;align-items:center;gap:9px;height:56px;padding:0 16px;color:var(--foreground)}
+.studio-sidebar [data-sidebar=header]{padding:0}
 .brand svg{color:var(--primary)}
 .brand strong{font-size:14px;font-weight:600}
 .studio-sidebar [data-sidebar=menu]{padding:0 8px;gap:2px}
@@ -71,7 +72,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .dark .error-banner,.dark .form-error{background:#3a1a20;border-color:#6b2a35;color:#ffb3bd}
 .theme-btn{margin:auto 8px 12px;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--muted-foreground)}
 [data-collapsible=icon] .brand strong{display:none}
-[data-collapsible=icon] .brand{justify-content:center;padding:18px 0 14px}
+[data-collapsible=icon] .brand{justify-content:center;padding:0}
 [data-collapsible=icon] [data-sidebar=menu]{padding:0 8px}
 .theme-btn:hover{background:var(--sidebar-accent);color:var(--foreground)}
 .empty{padding:48px 16px;text-align:center;color:var(--muted-foreground);display:flex;flex-direction:column;align-items:center;gap:14px;border:1px dashed var(--border);border-radius:8px}

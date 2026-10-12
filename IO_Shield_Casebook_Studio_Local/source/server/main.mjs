@@ -4,7 +4,7 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {GET,POST,PUT} from '../app/api/[...path]/route.ts';
 import {appRoot,dataRoot,closeStorage} from './storage.mjs';
-if(Number(process.versions.node.split('.')[0])<24)throw Error('Install Node.js 24 or newer to run Casebook Studio.');
+const [major,minor]=process.versions.node.split('.').map(Number);if(major<22||major===22&&minor<13)throw Error('Install Node.js 22.13 or newer to run Casebook Studio.');
 const port=Number(process.env.CASEBOOK_PORT||8765);
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('CASEBOOK_PORT must be between 1024 and 65535.');
 const origin=`http://127.0.0.1:${port}`;

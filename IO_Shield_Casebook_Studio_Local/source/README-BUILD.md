@@ -1,6 +1,6 @@
 # Local source build
 
-The bundled app in the parent folder is ready to run with Node.js 24 or newer.
+The bundled app in the parent folder is ready to run with Node.js 22.13 or newer.
 No npm install or build is needed for normal use.
 
 To edit and rebuild:

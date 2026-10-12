@@ -7939,7 +7939,8 @@ var POST = handle;
 var PUT = handle;
 
 // server/main.mjs
-if (Number(process.versions.node.split(".")[0]) < 24) throw Error("Install Node.js 24 or newer to run Casebook Studio.");
+var [major, minor] = process.versions.node.split(".").map(Number);
+if (major < 22 || major === 22 && minor < 13) throw Error("Install Node.js 22.13 or newer to run Casebook Studio.");
 var port = Number(process.env.CASEBOOK_PORT || 8765);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error("CASEBOOK_PORT must be between 1024 and 65535.");
 var origin = `http://127.0.0.1:${port}`;
