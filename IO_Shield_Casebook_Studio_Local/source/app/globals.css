@@ -5,6 +5,8 @@
 @source "../components/ui";
 @source "../web";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @utility scrollbar-thin {
   scrollbar-width: thin;
 }
@@ -23,6 +25,10 @@
 
 :root {
 --background:#f6f7f8;--foreground:#18252d;--card:#fff;--card-foreground:#18252d;--popover:#fff;--popover-foreground:#18252d;--primary:#087e85;--primary-foreground:#fff;--secondary:#eef1f3;--secondary-foreground:#18252d;--muted:#f1f3f5;--muted-foreground:#5d6c76;--accent:#e6f3f3;--accent-foreground:#0a565d;--destructive:#b42335;--border:#e3e7ea;--input:#d3d9de;--ring:#138b91;--radius:.5rem;--sidebar:#fbfbfc;--sidebar-foreground:#2b3a43;--sidebar-primary:#087e85;--sidebar-primary-foreground:#fff;--sidebar-accent:#eceff1;--sidebar-accent-foreground:#18252d;--sidebar-border:#e3e7ea;--sidebar-ring:#138b91;--chart-1:#087e85;--chart-2:#1c5a7a;--chart-3:#ca8a04;--chart-4:#6b5897;--chart-5:#aa405a;
+}
+.dark {
+--background:#111619;--foreground:#e4e9ec;--card:#182025;--card-foreground:#e4e9ec;--popover:#1c252b;--popover-foreground:#e4e9ec;--primary:#2bb0b4;--primary-foreground:#071a1c;--secondary:#212b31;--secondary-foreground:#e4e9ec;--muted:#212b31;--muted-foreground:#94a3ac;--accent:#16393b;--accent-foreground:#8fe0e0;--destructive:#ef5d6f;--border:#2a353c;--input:#36434b;--ring:#2bb0b4;--sidebar:#141b1f;--sidebar-foreground:#cfd8dd;--sidebar-primary:#2bb0b4;--sidebar-primary-foreground:#071a1c;--sidebar-accent:#212b31;--sidebar-accent-foreground:#e4e9ec;--sidebar-border:#2a353c;--sidebar-ring:#2bb0b4;
+color-scheme:dark;
 }
 @theme inline {
   --color-background: var(--background);

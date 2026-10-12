@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Upload,Plus,Download,FolderOpen,Clock,FileCheck,Layers,Briefcase,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil} from 'lucide-react';
+import {Upload,Plus,Download,FolderOpen,Clock,FileCheck,Layers,Briefcase,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil,Sun,Moon} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
@@ -11,21 +11,23 @@ import {Popover,PopoverTrigger,PopoverContent} from '@/components/ui/popover';
 import {Command,CommandInput,CommandList,CommandEmpty,CommandItem} from '@/components/ui/command';
 import {SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarInset,SidebarTrigger} from '@/components/ui/sidebar';
 import {Toaster,toast} from 'sonner';
-import {BookData,Edits,Row,editable,required,dateColumns,labels,timeNames,levels,rowsFor,excelDate,domainCode,clockTime,hoursBetween,nextNumberedId,nextCaseId,proofTypeFor} from '@/lib/casebook';
+import {BookData,Edits,Row,editable,required,dateColumns,labels,timeNames,levels,rowsFor,excelDate,domainCode,clockTime,hoursBetween,nextNumberedId,nextCaseId,proofTypeFor,addHours} from '@/lib/casebook';
 type FileRecord={id:string,name:string,hash:string,bytes:number,created:string};
 type Book={id:string,name:string,revision:number,updated:string,data:BookData,edits:Edits,files:FileRecord[]};
 type Upload={id:string,name:string,hash:string,ref:string};
 type Form={sheet:string,row:number,existing:boolean};
 const CASES='Case Register',SESSIONS='Session Ledger',PROOF='Evidence Index',CLAIMS='Competency Evidence',PORTFOLIO='Portfolio';
 const caseCol=(sheet:string)=>sheet===SESSIONS?'C':'B';
-// Fields shown up front. Everything else is filled in and sits under "Details".
-const primary:Record<string,string[]>={
- [CASES]:['C','B','X','W'],
- [SESSIONS]:['C','B','D','J','K','L','I'],
- [PROOF]:['B','E'],
- [CLAIMS]:['B','E','H','K'],
- [PORTFOLIO]:['B','D','M'],
+// Form layout: rows of related fields side by side. "more" holds optional or rarely changed fields.
+const layouts:Record<string,{rows:string[][],more:string[]}>={
+ [CASES]:{rows:[['C'],['B','D','E'],['F','G','N'],['H','I'],['X'],['W']],more:['K','J','Y','V','Z','A']},
+ [SESSIONS]:{rows:[['C','B'],['D'],['J','K','L','I'],['O'],['E','F','P'],['G','H']],more:['N','R','A']},
+ [PROOF]:{rows:[['B','C'],['F'],['E'],['D','H'],['I','J']],more:['K','N','A']},
+ [CLAIMS]:{rows:[['B','C'],['E'],['H'],['K','J'],['D','G']],more:['L','M','Q','R','T','A']},
+ [PORTFOLIO]:{rows:[['B','C'],['D'],['E','G'],['M'],['I']],more:['H','A']},
 };
+// Free-text fields where earlier answers are offered as suggestions.
+const suggestCols:Record<string,string[]>={[CASES]:['J'],[SESSIONS]:['N'],[PROOF]:['K']};
 const longFields=['What I Did','Result','Notes','What I Worked On','What It Shows','Scope / Permission','Fix / Recovery','Privacy / Cleanup'];
 // Used only when an older import has no dropdown lists stored with it.
 const fallbackLists:Record<string,Record<string,string[]>>={
@@ -39,10 +41,12 @@ const today=()=>new Date().toLocaleDateString('en-CA');
 async function api(path:string,init?:RequestInit):Promise<any>{const r=await fetch('/api/'+path,init);if(!r.ok){let message='The request could not be completed.';try{const t=await r.text();try{message=JSON.parse(t).error??message;}catch{message=t;}}catch{}throw Error(message);}return r.json();}
 function downloadBlob(blob:Blob,name:string){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function Choice({value,onChange,options,label}:{value:string,onChange:(v:string)=>void,options:[string,string][],label:string}){const safe=value&&!options.some(o=>o[0]===value)?[[value,value] as [string,string],...options]:options;return <Select value={value||undefined} onValueChange={onChange}><SelectTrigger aria-label={label} className="w-full"><SelectValue placeholder="Choose…"/></SelectTrigger><SelectContent>{safe.map(([v,l])=><SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent></Select>;}
-function SearchChoice({value,onChange,options,label,placeholder='Choose…'}:{value:string,onChange:(v:string)=>void,options:[string,string][],label:string,placeholder?:string}){const [open,setOpen]=useState(false);return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button type="button" variant="outline" className="picker" role="combobox" aria-expanded={open} aria-label={label}><span>{options.find(o=>o[0]===value)?.[1]??(value||placeholder)}</span><ChevronsUpDown size={15}/></Button></PopoverTrigger><PopoverContent className="w-[min(520px,88vw)] p-0" align="start"><Command><CommandInput placeholder="Search…"/><CommandList><CommandEmpty>No matches.</CommandEmpty>{options.map(([id,name])=><CommandItem key={id||'none'} value={id+' '+name} onSelect={()=>{onChange(id);setOpen(false);}}>{value===id?<Check size={15}/>:<span className="w-[15px]"/>}<span>{name}</span></CommandItem>)}</CommandList></Command></PopoverContent></Popover>;}
+function SearchChoice({value,onChange,options,label,placeholder='Choose…'}:{value:string,onChange:(v:string)=>void,options:[string,string][],label:string,placeholder?:string}){const [open,setOpen]=useState(false);return <Popover modal open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button type="button" variant="outline" className="picker" role="combobox" aria-expanded={open} aria-label={label}><span>{options.find(o=>o[0]===value)?.[1]??(value||placeholder)}</span><ChevronsUpDown size={15}/></Button></PopoverTrigger><PopoverContent className="w-[min(520px,88vw)] p-0" align="start"><Command><CommandInput placeholder="Search…"/><CommandList><CommandEmpty>No matches.</CommandEmpty>{options.map(([id,name])=><CommandItem key={id||'none'} value={id+' '+name} onSelect={()=>{onChange(id);setOpen(false);}}>{value===id?<Check size={15}/>:<span className="w-[15px]"/>}<span>{name}</span></CommandItem>)}</CommandList></Command></PopoverContent></Popover>;}
 export default function Studio({displayName}:{displayName:string}){
  const [books,setBooks]=useState<any[]>([]),[book,setBook]=useState<Book|null>(null),[view,setView]=useState<'cases'|'case'|'skills'|'history'>('cases'),[openCase,setOpenCase]=useState(''),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState('');
  const [form,setForm]=useState<Form|null>(null),[values,setValues]=useState<Record<string,string>>({}),[pending,setPending]=useState<Upload[]>([]),[formError,setFormError]=useState(''),[saving,setSaving]=useState(false),[history,setHistory]=useState<any[]>([]),[portfolio,setPortfolio]=useState<Row|null>(null),[publicCheck,setPublicCheck]=useState(false),[dragging,setDragging]=useState(false);
+ const [dark,setDark]=useState(()=>document.documentElement.classList.contains('dark'));
+ function toggleTheme(){const next=!dark;setDark(next);document.documentElement.classList.toggle('dark',next);try{localStorage.setItem('theme',next?'dark':'light');}catch{}}
  const uploadRef=useRef<HTMLInputElement>(null),fileRef=useRef<HTMLInputElement>(null),lastForm=useRef<Form|null>(null);
  if(form)lastForm.current=form;
  const shown=form??lastForm.current;
@@ -104,6 +108,7 @@ export default function Studio({displayName}:{displayName:string}){
   if(!form.existing&&col===caseCol(sheet)&&sheet!==CASES)next=inferFromCase(sheet,v,next);
   if(sheet===CASES&&col==='B'&&!form.existing)next=withParent(next,v);
   if(sheet===SESSIONS&&(col==='J'||col==='K')){const h=hoursBetween(next.J,next.K);if(h)next.L=h;}
+  if(sheet===SESSIONS&&col==='L'&&next.J){const e=addHours(next.J,v);if(e)next.K=e;}
   if(sheet===SESSIONS&&col==='I'&&['T4','T5'].includes(v))Object.assign(next,{J:'',K:'',L:''});
   if(sheet===CLAIMS&&col==='E'){const skill=catalog.find(r=>r.values.A===v);if(skill){next.F=skill.values.C;next.D=domainCode(skill.values.B);}}
   return next;});}
@@ -154,8 +159,9 @@ export default function Studio({displayName}:{displayName:string}){
   if(sheet===CLAIMS&&col==='F')return null;
   if(options)return <Field key={col} label={label} required={req}><Choice label={label} options={options} value={label.includes('Domain')||sheet===CLAIMS&&col==='D'?domainCode(value):value} onChange={set}/></Field>;
   if(wide)return <Field key={col} label={sheet===PORTFOLIO&&col==='M'?'Story':label} required={req} wide><Textarea rows={3} value={value} onChange={e=>set(e.target.value)}/></Field>;
-  const date=(dateColumns[sheet]??[]).includes(col),id=`dl-${sheet}-${col}`.replace(/\W/g,''),hints=!date&&col!=='A'?suggestions(sheet,col):[];
-  return <Field key={col} label={label} required={req}><Input aria-label={label} value={value} type={date?'date':'text'} list={hints.length?id:undefined} onChange={e=>set(e.target.value)} readOnly={col==='A'&&form.existing}/>{hints.length>0&&<datalist id={id}>{hints.map(h=><option key={h} value={h}/>)}</datalist>}</Field>;
+  const date=(dateColumns[sheet]??[]).includes(col);
+  if(suggestCols[sheet]?.includes(col))return <Field key={col} label={label} required={req}><SuggestInput label={label} value={value} onChange={set} options={suggestions(sheet,col)}/></Field>;
+  return <Field key={col} label={label} required={req}><Input aria-label={label} value={value} type={date?'date':'text'} onChange={e=>set(e.target.value)} readOnly={col==='A'&&form.existing}/></Field>;
  }
  function AttachButton(){return <button type="button" className="chip add" onClick={()=>fileRef.current?.click()} disabled={saving}><Paperclip size={13}/>Attach</button>;}
 
@@ -169,7 +175,7 @@ export default function Studio({displayName}:{displayName:string}){
  const parents=cases.filter(isParent),loose=cases.filter(r=>!isParent(r)&&!parentOf(r));
 
  return <SidebarProvider style={{'--sidebar-width':'13rem'} as React.CSSProperties}><Toaster position="bottom-right"/>
- <Sidebar className="studio-sidebar"><SidebarHeader><div className="brand"><Shield size={18}/><strong>Casebook Studio</strong></div></SidebarHeader><SidebarContent><SidebarMenu>{nav.map(s=><SidebarMenuItem key={s.id}><SidebarMenuButton isActive={view===s.id||s.id==='cases'&&view==='case'} onClick={()=>{setView(s.id);setSearch('');}} disabled={!book}><s.icon/><span>{s.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarContent></Sidebar>
+ <Sidebar className="studio-sidebar"><SidebarHeader><div className="brand"><Shield size={18}/><strong>Casebook Studio</strong></div></SidebarHeader><SidebarContent><SidebarMenu>{nav.map(s=><SidebarMenuItem key={s.id}><SidebarMenuButton isActive={view===s.id||s.id==='cases'&&view==='case'} onClick={()=>{setView(s.id);setSearch('');}} disabled={!book}><s.icon/><span>{s.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu><button className="theme-btn" onClick={toggleTheme}>{dark?<Sun size={15}/>:<Moon size={15}/>}{dark?'Light mode':'Dark mode'}</button></SidebarContent></Sidebar>
  <SidebarInset><header className="topbar"><div className="topbar-left"><SidebarTrigger/>{view==='case'&&current&&<button className="crumb" onClick={()=>setView('cases')}><ChevronLeft size={16}/>Cases</button>}</div>
   <div className="topbar-actions">{book&&<Button className="primary-button" size="sm" onClick={()=>start(SESSIONS)} disabled={busy||!cases.some(r=>!isParent(r))}><Clock size={15}/>Log session</Button>}
   <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" className="book-menu">{book?.data.profile.Name||book?.name.replace(/\.xlsx$/i,'')||'Casebook'}<ChevronDown size={15}/></Button></PopoverTrigger><PopoverContent align="end" className="menu w-64 p-1.5">
@@ -187,7 +193,7 @@ export default function Studio({displayName}:{displayName:string}){
   <div className="stats"><Stat label="Cases" value={cases.filter(r=>!isParent(r)).length}/><Stat label="Tracked hours" value={tracked.toFixed(1)}/><Stat label="Rebuilt hours" value={rebuilt.toFixed(1)}/><Stat label="Skill claims" value={claims.length}/></div>
   {cases.length===0?<div className="empty"><p>No cases yet.</p><Button variant="outline" onClick={()=>start(CASES)}><Plus size={15}/>New case</Button></div>:
   [...parents.map(p=>({p,kids:cases.filter(r=>!isParent(r)&&parentOf(r)===p)})),{p:undefined,kids:loose}].filter(g=>g.kids.length||g.p).map(g=>{const kids=g.kids.filter(match);if(q&&!kids.length&&!(g.p&&match(g.p)))return null;return <section className="group" key={g.p?.values.A??'loose'}>
-   {g.p?<div className="group-head"><span className="mono">{g.p.values.A}</span><h2>{g.p.values.C}</h2><button className="icon-btn" aria-label="Edit project" onClick={()=>start(CASES,g.p)}><Pencil size={14}/></button><button className="text-btn" onClick={()=>start(CASES,undefined,g.p!.values.A)}><Plus size={14}/>Case</button></div>:parents.length>0&&g.kids.length>0&&<div className="group-head"><h2>Other cases</h2></div>}
+   {g.p?<div className="group-head"><span className="mono">{g.p.values.A}</span><h2>{g.p.values.C}</h2><button className="icon-btn" aria-label="Edit project" onClick={()=>start(CASES,g.p)}><Pencil size={14}/></button><button className="text-btn" onClick={()=>start(CASES,undefined,g.p!.values.A)}><Plus size={14}/>Add case to project</button></div>:parents.length>0&&g.kids.length>0&&<div className="group-head"><h2>Other cases</h2></div>}
    <div className="list">{kids.map(r=><button key={r.row} className="case-row" onClick={()=>goCase(r.values.A)}><span className="mono">{r.values.A}</span><span className="case-name">{r.values.C}</span><span className="muted">{domainLabel(r.values.H??'')}</span><span className="muted num">{caseHours(r.values.A).toFixed(1)} h</span>{status(r.values.L)}</button>)}</div>
   </section>;})}
  </>:
@@ -198,15 +204,15 @@ export default function Studio({displayName}:{displayName:string}){
  </>:
  view==='history'?<>
   <div className="heading"><h1>History</h1></div>
-  {history.length===0?<div className="empty"><p>No changes yet.</p></div>:<div className="list">{history.map(h=>{const d=JSON.parse(h.detail);return <details className="history-row" key={h.revision}><summary><span className="mono">r{h.revision}</span><span className="case-name">{labels[d.sheet]} · {d.after.A}</span><span className="muted">{new Date(h.created).toLocaleString()}</span></summary><pre>{JSON.stringify({before:d.before,after:d.after},null,2)}</pre></details>;})}</div>}
+  {history.length===0?<div className="empty"><p>No changes yet.</p></div>:<div className="list">{history.map(h=>{const d=JSON.parse(h.detail),added=!d.before?.A,heads=book.data.sheets[d.sheet]?.headers??{},changed=Object.keys(d.after).filter(k=>(d.before?.[k]??'')!==(d.after[k]??'')).map(k=>heads[k]??k);return <details className="history-row" key={h.revision}><summary><span className="case-name">{added?'Added':'Edited'} {labels[d.sheet]?.toLowerCase()} {d.after.A}</span><span className="muted truncate">{added?'':changed.join(', ')}</span><span className="muted num">{new Date(h.created).toLocaleString()}</span></summary><div className="history-diff">{Object.keys(d.after).filter(k=>(d.before?.[k]??'')!==(d.after[k]??'')).map(k=><div key={k}><span className="muted">{heads[k]??k}</span><span>{d.before?.[k]?<><s>{d.before[k]}</s> → </>:''}{d.after[k]||'—'}</span></div>)}</div></details>;})}</div>}
  </>:null}
  </main></SidebarInset>
 
  <Dialog open={!!form} onOpenChange={open=>{if(!open&&!saving)setForm(null);}}><DialogContent className="entry-dialog"><DialogHeader><DialogTitle>{shown?.existing?'Edit':shown?.sheet===SESSIONS?'Log':shown?.sheet===CLAIMS?'Claim':'New'} {shown&&(shown.sheet===CLAIMS?'skill':labels[shown.sheet].toLowerCase())}</DialogTitle><DialogDescription className="mono">{values.A}</DialogDescription></DialogHeader>
   <div className={'entry-scroll'+(dragging?' over':'')} onDragOver={e=>{if(form?.sheet!==CASES&&form?.sheet!==PORTFOLIO){e.preventDefault();setDragging(true);}}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);if(e.dataTransfer.files.length)uploadFiles(e.dataTransfer.files);}} onPaste={e=>{const files=[...e.clipboardData.files];if(files.length&&form?.sheet!==CASES&&form?.sheet!==PORTFOLIO){e.preventDefault();uploadFiles(files);}}}>
   {formError&&<div className="form-error" role="alert">{formError}</div>}
-  {shown&&<><div className="form-grid">{primary[shown.sheet].map(c=>field(c))}{shown.sheet===SESSIONS&&field('O')}</div>
-  <details className="more"><summary>Details</summary><div className="form-grid">{editable[shown.sheet].filter(c=>!primary[shown.sheet].includes(c)&&!(shown.sheet===SESSIONS&&c==='O')).map(c=>field(c))}</div></details></>}
+  {shown&&<><div className="form-rows">{layouts[shown.sheet].rows.map((row,i)=>{const cells=row.map(c=>field(c)).filter(Boolean);return cells.length?<div key={i} className="form-row" style={{gridTemplateColumns:`repeat(${cells.length},minmax(0,1fr))`}}>{cells}</div>:null;})}</div>
+  <details className="more"><summary>More</summary><div className="form-grid">{layouts[shown.sheet].more.map(c=>field(c))}</div></details></>}
   </div>
   <div className="dialog-actions"><Button variant="ghost" onClick={()=>setForm(null)} disabled={saving}>Cancel</Button><Button className="primary-button" onClick={saveEntry} disabled={saving}>{saving?'Saving…':'Save'}</Button></div>
  </DialogContent></Dialog>
@@ -234,6 +240,7 @@ export default function Studio({displayName}:{displayName:string}){
   </>;
  }
 }
+function SuggestInput({value,onChange,options,label}:{value:string,onChange:(v:string)=>void,options:string[],label:string}){const [open,setOpen]=useState(false);const list=options.filter(o=>o!==value&&o.toLowerCase().includes(value.toLowerCase())).slice(0,8);return <div className="suggest"><Input aria-label={label} value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),120)}/>{open&&list.length>0&&<div className="suggest-list" role="listbox">{list.map(o=><button type="button" role="option" key={o} onMouseDown={e=>{e.preventDefault();onChange(o);setOpen(false);}}>{o}</button>)}</div>}</div>;}
 function Section({title,count,extra,add,addLabel,children}:{title:string,count:number,extra?:string,add:()=>void,addLabel:string,children:React.ReactNode}){return <section className="group"><div className="group-head"><h2>{title}</h2><span className="muted">{count||''}{extra&&count?` · ${extra}`:''}</span><button className="text-btn" onClick={add}><Plus size={14}/>{addLabel}</button></div>{count>0&&<div className="list">{children}</div>}</section>;}
 function Field({label,required=false,wide=false,children}:{label:string,required?:boolean,wide?:boolean,children:React.ReactNode}){return <label className={'field '+(wide?'wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</label>;}
 function Stat({label,value}:{label:string,value:string|number}){return <div className="stat"><strong>{value}</strong><span>{label}</span></div>;}

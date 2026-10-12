@@ -78,3 +78,7 @@ export function proofTypeFor(name:string):string {
  if(['pdf','docx','md'].includes(ext))return 'Report';
  return 'Other';
 }
+export function addHours(start:string,hours:string):string {
+ const a=clockTime(start),h=+hours;if(!a||!Number.isFinite(h)||h<=0)return '';
+ const m=(+a.slice(0,2)*60+ +a.slice(3)+Math.round(h*60))%1440;return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+}
