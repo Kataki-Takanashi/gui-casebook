@@ -67,6 +67,7 @@ CURRENT LIMITS
   portfolio hosting, or operational evidence chain-of-custody workflow.
 - Portfolio exports require cleanup confirmation and explicit sharing
   acknowledgment; they include draft text, not private attachments.
+- On the roadmap: a blank casebook template and a New casebook option.
 
 TROUBLESHOOTING
 - If port 8765 is already in use, an app window may already be running.

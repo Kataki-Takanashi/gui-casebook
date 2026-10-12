@@ -24,9 +24,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/conventions.js
+// node_modules/@xmldom/xmldom/lib/conventions.js
 var require_conventions = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/conventions.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/conventions.js"(exports) {
     "use strict";
     function find(list, predicate, ac) {
       if (ac === void 0) {
@@ -233,9 +233,9 @@ var require_conventions = __commonJS({
   }
 });
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/errors.js
+// node_modules/@xmldom/xmldom/lib/errors.js
 var require_errors = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/errors.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/errors.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     function extendError(constructor, writableName) {
@@ -392,9 +392,9 @@ var require_errors = __commonJS({
   }
 });
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/grammar.js
+// node_modules/@xmldom/xmldom/lib/grammar.js
 var require_grammar = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/grammar.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/grammar.js"(exports) {
     "use strict";
     function detectUnicodeSupport(RegExpImpl) {
       try {
@@ -599,9 +599,9 @@ var require_grammar = __commonJS({
   }
 });
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/dom.js
+// node_modules/@xmldom/xmldom/lib/dom.js
 var require_dom = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/dom.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/dom.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var find = conventions.find;
@@ -612,7 +612,7 @@ var require_dom = __commonJS({
     var isHTMLVoidElement = conventions.isHTMLVoidElement;
     var MIME_TYPE = conventions.MIME_TYPE;
     var NAMESPACE = conventions.NAMESPACE;
-    var PDC = Symbol();
+    var PDC = /* @__PURE__ */ Symbol();
     var errors = require_errors();
     var DOMException = errors.DOMException;
     var DOMExceptionName = errors.DOMExceptionName;
@@ -1898,7 +1898,7 @@ var require_dom = __commonJS({
         }
       }
     }
-    walkDOM.STOP = Symbol("walkDOM.STOP");
+    walkDOM.STOP = /* @__PURE__ */ Symbol("walkDOM.STOP");
     walkDOM.ENTER = 0;
     walkDOM.EXIT = 1;
     function Document(symbol, options) {
@@ -3266,9 +3266,9 @@ var require_dom = __commonJS({
   }
 });
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/entities.js
+// node_modules/@xmldom/xmldom/lib/entities.js
 var require_entities = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/entities.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/entities.js"(exports) {
     "use strict";
     var freeze = require_conventions().freeze;
     exports.XML_ENTITIES = freeze({
@@ -5409,9 +5409,9 @@ var require_entities = __commonJS({
   }
 });
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/sax.js
+// node_modules/@xmldom/xmldom/lib/sax.js
 var require_sax = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/sax.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/sax.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var g = require_grammar();
@@ -6191,9 +6191,9 @@ var require_sax = __commonJS({
   }
 });
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/dom-parser.js
+// node_modules/@xmldom/xmldom/lib/dom-parser.js
 var require_dom_parser = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/dom-parser.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/dom-parser.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     var dom = require_dom();
@@ -6459,9 +6459,9 @@ var require_dom_parser = __commonJS({
   }
 });
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/index.js
+// node_modules/@xmldom/xmldom/lib/index.js
 var require_lib = __commonJS({
-  "../../../sites/casebook-studio/node_modules/.pnpm/@xmldom+xmldom@0.9.12/node_modules/@xmldom/xmldom/lib/index.js"(exports) {
+  "node_modules/@xmldom/xmldom/lib/index.js"(exports) {
     "use strict";
     var conventions = require_conventions();
     exports.assign = conventions.assign;
@@ -6604,7 +6604,7 @@ async function owned(id, owner) {
   return b;
 }
 
-// ../../../sites/casebook-studio/node_modules/.pnpm/fflate@0.8.3/node_modules/fflate/esm/index.mjs
+// node_modules/fflate/esm/index.mjs
 import { createRequire } from "module";
 var require2 = createRequire("/");
 var _a;
@@ -7591,7 +7591,7 @@ function unzipSync(data, opts) {
 }
 
 // lib/workbook.ts
-var import_xmldom = __toESM(require_lib());
+var import_xmldom = __toESM(require_lib(), 1);
 
 // lib/casebook.ts
 var limits = { "Case Register": 254, "Session Ledger": 504, "Evidence Index": 754, "Competency Evidence": 1004, "Portfolio": 254 };
