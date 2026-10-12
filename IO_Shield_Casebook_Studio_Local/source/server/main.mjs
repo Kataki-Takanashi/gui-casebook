@@ -13,13 +13,14 @@ const security={'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referre
 let queue=Promise.resolve();
 async function respond(req,res){
  try{
-  const host=req.headers.host;if(host!==`127.0.0.1:${port}`){res.writeHead(403,security);return res.end('Open the app using '+origin);}
-  if(req.headers.origin&&req.headers.origin!==origin||req.headers['sec-fetch-site']==='cross-site'){res.writeHead(403,security);return res.end('Cross-site requests are blocked.');}
-  const url=new URL(req.url,origin);
+  const host=req.headers.host,allowed=[`127.0.0.1:${port}`,`localhost:${port}`];if(!allowed.includes(host)){res.writeHead(403,security);return res.end('Open the app using '+origin);}
+  const here='http://'+host;
+  if(req.headers.origin&&req.headers.origin!==here||req.headers['sec-fetch-site']==='cross-site'){res.writeHead(403,security);return res.end('Cross-site requests are blocked.');}
+  const url=new URL(req.url,here);
   if(url.pathname==='/health'){res.writeHead(200,{'Content-Type':'application/json',...security});return res.end(JSON.stringify({app:'Casebook Studio Local',version:'0.1.1',local:true}));}
   if(url.pathname.startsWith('/api/')){
    const handler={GET,POST,PUT}[req.method];if(!handler){res.writeHead(405,security);return res.end('Method not allowed.');}
-   let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>12*1024*1024){res.writeHead(413,security);return res.end('Upload exceeds 12 MB request limit.');}chunks.push(chunk);}
+   let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>40*1024*1024){res.writeHead(413,security);return res.end('Upload exceeds 40 MB request limit.');}chunks.push(chunk);}
    const request=new Request(url,{method:req.method,headers:new Headers(Object.entries(req.headers).filter(([,v])=>v!==undefined).map(([k,v])=>[k,Array.isArray(v)?v.join(','):v])),...(req.method!=='GET'?{body:Buffer.concat(chunks)}:{})});
    const response=await handler(request);res.writeHead(response.status,{...Object.fromEntries(response.headers),...security});return res.end(Buffer.from(await response.arrayBuffer()));
   }

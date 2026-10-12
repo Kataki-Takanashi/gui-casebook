@@ -10,7 +10,7 @@ WINDOWS
 2. Install Node.js 24 (or newer) from https://nodejs.org/en/download.
    Alternatively, place a portable Node.js 24 node.exe in runtime\.
 3. Double-click Start_Casebook_Windows.cmd.
-4. Your default browser opens http://127.0.0.1:8765.
+4. Your default browser opens http://127.0.0.1:8765 (localhost:8765 also works).
    If it does not open automatically, paste that address into your browser.
 5. Keep the launcher window open while working. Press Ctrl+C to stop.
 
@@ -22,11 +22,13 @@ to execute a downloaded script. It can be launched from Terminal with:
 sh Start_Casebook_Mac_Linux.command
 
 USING YOUR CASEBOOK
-- Choose Upload casebook and select your Field School Casebook v3 .xlsx.
+- Drop your casebook .xlsx on the start page, or use the casebook menu
+  (top right) > Import casebook.
 - Import occurs locally. The original workbook is retained untouched.
-- Use the forms for cases, sessions, proof, skill claims, and portfolio drafts.
-- Use Excel to download an updated revision.
-- Use Excel + proof to download a ZIP with the workbook, uploaded supporting
+- Open a case to log sessions, add proof, claim skills, and write portfolio
+  stories. IDs, hours, and fields from the case are filled in for you.
+- Casebook menu > Download Excel saves an updated revision.
+- Download Excel + proof saves a ZIP with the workbook, uploaded supporting
   files, and revision history. Extract the complete bundle together.
 - Open exported Excel files in Excel or LibreOffice to recalculate formulas.
 - Updated revisions are separate files; the original spreadsheet on your
@@ -58,7 +60,7 @@ Do not expose this version to the internet or treat it as a multi-user server.
 
 CURRENT LIMITS
 - Imports support the supplied v3 workbook layout, not arbitrary Excel files.
-- Up to 20 casebooks, 8 MB per workbook, 10 MB per attachment, and 100 proof
+- Up to 20 casebooks, 30 MB per workbook, 10 MB per attachment, and 100 proof
   files totaling 40 MB per casebook.
 - Entry capacity follows the template's fixed summary ranges: 250 cases,
   500 sessions, 750 proof records, 1,000 skill claims.

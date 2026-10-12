@@ -1,5 +1,5 @@
 export type Row={row:number,values:Record<string,string>};
-export type BookData={profile:Record<string,string>,sheets:Record<string,{path:string,headers:Record<string,string>,rows:Row[],capacity:number}>,sheetNames:string[]};
+export type BookData={profile:Record<string,string>,sheets:Record<string,{path:string,headers:Record<string,string>,rows:Row[],capacity:number,lists?:Record<string,string[]>}>,sheetNames:string[]};
 export type Edits=Record<string,Record<string,Record<string,string>>>;
 export const limits:Record<string,number>={'Case Register':254,'Session Ledger':504,'Evidence Index':754,'Competency Evidence':1004,'Portfolio':254};
 export const editable:Record<string,string[]>={
@@ -42,4 +42,39 @@ export function validateEntry(data:BookData,edits:Edits,sheet:string,row:number,
   const skill=data.sheets['Competency Catalog'].rows.find(r=>r.values.A===values.E);if(!skill||skill.values.C!==values.F)throw Error('Choose a skill from the uploaded catalog.');
   const proofIds=values.H.split(/[,;\s]+/).filter(Boolean),known=rowsFor(data,edits,'Evidence Index');if(proofIds.some(id=>!known.some(r=>r.values.A===id&&r.values.B===values.B)))throw Error('Every proof ID must belong to the selected case.');
  }return current;
+}
+// Google Sheets exports store codes like 2 or 8 as "2.0" / "8.0"; the template uses "02" / "08".
+export function domainCode(value:string):string {const v=(value??'').trim();return /^\d+(\.0+)?$/.test(v)?String(parseInt(v,10)).padStart(2,'0'):v;}
+// Accepts "19:00", "7:00 PM", or an Excel time fraction like 0.79; returns "HH:MM" or ''.
+export function clockTime(value:string):string {
+ const v=(value??'').trim();if(!v)return '';
+ if(/^0?\.\d+$|^0$/.test(v)){const m=Math.round(+v*1440);return `${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;}
+ const m=/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/.exec(v);if(!m)return '';
+ let h=+m[1];if(m[3]){h=h%12+(/p/i.test(m[3])?12:0);}return h<24&&+m[2]<60?`${String(h).padStart(2,'0')}:${m[2]}`:'';
+}
+export function hoursBetween(start:string,end:string):string {
+ const a=clockTime(start),b=clockTime(end);if(!a||!b)return '';
+ const mins=(t:string)=>+t.slice(0,2)*60+ +t.slice(3);let d=mins(b)-mins(a);if(d<=0)d+=1440;
+ return String(Math.round(d/60*100)/100);
+}
+// Next "<prefix>NNN" ID that is not used anywhere in the sheet.
+export function nextNumberedId(ids:string[],prefix:string):string {
+ const used=new Set(ids);let n=Math.max(0,...ids.filter(id=>id.startsWith(prefix)).map(id=>+(/(\d+)$/.exec(id.slice(prefix.length))?.[1]??0)))+1;
+ while(used.has(prefix+String(n).padStart(3,'0')))n++;return prefix+String(n).padStart(3,'0');
+}
+// Child cases use the parent ID plus a letter (2026-001A); new projects use YEAR-NNN.
+export function nextCaseId(ids:string[],parentId:string,year:number):string {
+ const used=new Set(ids);
+ if(parentId){for(let i=0;i<26*27;i++){const s=i<26?String.fromCharCode(65+i):String.fromCharCode(64+Math.floor(i/26))+String.fromCharCode(65+i%26);if(!used.has(parentId+s))return parentId+s;}}
+ const top=ids.map(id=>new RegExp(`^${year}-(\\d{3})`).exec(id)?.[1]).filter(Boolean).map(Number);
+ let n=Math.max(0,...top)+1;while(used.has(`${year}-${String(n).padStart(3,'0')}`))n++;return `${year}-${String(n).padStart(3,'0')}`;
+}
+export function proofTypeFor(name:string):string {
+ const ext=(/\.([a-z0-9]+)$/i.exec(name)?.[1]??'').toLowerCase();
+ if(['png','jpg','jpeg','webp'].includes(ext))return 'Screenshot';
+ if(['log','txt'].includes(ext))return 'Command Log';
+ if(['pcap','pcapng'].includes(ext))return 'PCAP';
+ if(['conf','yaml','yml','json'].includes(ext))return 'Configuration';
+ if(['pdf','docx','md'].includes(ext))return 'Report';
+ return 'Other';
 }

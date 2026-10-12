@@ -7650,11 +7650,11 @@ var xml = (b) => new import_xmldom.DOMParser().parseFromString(strFromU8(b), "ap
 var els = (e, name) => Array.from(e.getElementsByTagNameNS("*", name));
 var text = (e) => e?.textContent ?? "";
 function unpack(bytes) {
-  if (bytes.length > 8 * 1024 * 1024) throw Error("Upload a casebook smaller than 8 MB.");
+  if (bytes.length > 30 * 1024 * 1024) throw Error("Upload a casebook smaller than 30 MB.");
   let expanded = 0;
   const files = unzipSync(bytes, { filter: (f) => {
     expanded += f.originalSize;
-    if (expanded > 40 * 1024 * 1024) throw Error("Workbook contents exceed 40 MB.");
+    if (expanded > 120 * 1024 * 1024) throw Error("Workbook contents exceed 120 MB.");
     return true;
   } });
   if (!files["xl/workbook.xml"] || !files["xl/_rels/workbook.xml.rels"]) throw Error("Upload an unencrypted .xlsx workbook.");
@@ -7671,6 +7671,30 @@ function paths(files) {
   }
   return out;
 }
+function validationLists(doc) {
+  const out = {};
+  for (const dv of els(doc, "dataValidation")) {
+    if (dv.getAttribute("type") !== "list") continue;
+    const f = text(els(dv, "formula1")[0]).trim();
+    if (!/^".*"$/.test(f)) continue;
+    const items = f.slice(1, -1).split(",").map((v) => v.trim()).filter(Boolean);
+    for (const range of (dv.getAttribute("sqref") ?? "").split(/\s+/)) {
+      const m = /^([A-Z]+)\d*(?::([A-Z]+)\d*)?$/.exec(range);
+      if (!m) continue;
+      for (let n = columnNumber(m[1]); n <= columnNumber(m[2] ?? m[1]); n++) out[columnName(n)] ??= items;
+    }
+  }
+  return out;
+}
+function columnName(n) {
+  let s = "";
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
 function parseWorkbook(bytes) {
   const files = unpack(bytes), sheetPaths = paths(files), strings = files["xl/sharedStrings.xml"] ? els(xml(files["xl/sharedStrings.xml"]), "si").map((s) => els(s, "t").map(text).join("")) : [], sheets = {}, profile = {};
   for (const [name, path3] of Object.entries(sheetPaths)) {
@@ -7685,7 +7709,7 @@ function parseWorkbook(bytes) {
       if (row >= 5 && values.A) rows.push({ row, values });
       if (name === "Analyst Profile" && values.A) profile[values.A] = values.B ?? "";
     }
-    sheets[name] = { path: path3, headers, rows, capacity: limits[name] ?? 1e4 };
+    sheets[name] = { path: path3, headers, rows, capacity: limits[name] ?? 1e4, lists: validationLists(doc) };
   }
   const expected = { "Case Register": { A: "Case ID", C: "Case / Project", N: "Time Class", X: "What I Did" }, "Session Ledger": { A: "Session ID", C: "Case ID", I: "Time Class", L: "Hours Entered" }, "Evidence Index": { A: "Proof ID", B: "Case ID", F: "File / Link" }, "Competency Evidence": { A: "Demo ID", B: "Case ID", E: "Skill ID", N: "Review Status" }, "Portfolio": { A: "Item ID", B: "Case ID", D: "Title", J: "Approval" }, "Competency Catalog": { A: "Skill ID", C: "Skill" }, "Domain Framework": { A: "ID", C: "Practice Domain" } };
   for (const [s, cols] of Object.entries(expected)) for (const [col, label] of Object.entries(cols)) if (sheets[s]?.headers[col] !== label) throw Error(`This workbook does not match the supported Casebook v3 layout: ${s}, ${label}.`);
@@ -7796,9 +7820,9 @@ async function handle(request) {
         if (count.n >= 20) throw Error("The pilot supports up to 20 casebooks per person.");
         const form = await request.formData(), file = form.get("file");
         if (!(file instanceof File) || !file.name.toLowerCase().endsWith(".xlsx")) throw Error("Choose a .xlsx casebook.");
-        if (file.size > 8 * 1024 * 1024) throw Error("Casebooks must be smaller than 8 MB.");
+        if (file.size > 30 * 1024 * 1024) throw Error("Casebooks must be smaller than 30 MB.");
         const bytes = new Uint8Array(await file.arrayBuffer()), data2 = parseWorkbook(bytes), parsed = JSON.stringify(data2);
-        if (parsed.length > 15e5) throw Error("This casebook contains too much data for the pilot.");
+        if (parsed.length > 8e6) throw Error("This casebook contains too much data for the pilot.");
         const id = crypto.randomUUID(), key = owner + "/" + id + "/original.xlsx", created = now();
         await bucket().put(key, bytes, { httpMetadata: { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } });
         await db().prepare("INSERT INTO casebooks (id,owner,name,original_key,parsed,edits,revision,created,updated) VALUES (?,?,?,?,?,'{}',0,?,?)").bind(id, owner, safeName(file.name), key, parsed, created, created).run();
@@ -7924,16 +7948,17 @@ var security = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-ref
 var queue = Promise.resolve();
 async function respond(req, res) {
   try {
-    const host = req.headers.host;
-    if (host !== `127.0.0.1:${port}`) {
+    const host = req.headers.host, allowed = [`127.0.0.1:${port}`, `localhost:${port}`];
+    if (!allowed.includes(host)) {
       res.writeHead(403, security);
       return res.end("Open the app using " + origin);
     }
-    if (req.headers.origin && req.headers.origin !== origin || req.headers["sec-fetch-site"] === "cross-site") {
+    const here = "http://" + host;
+    if (req.headers.origin && req.headers.origin !== here || req.headers["sec-fetch-site"] === "cross-site") {
       res.writeHead(403, security);
       return res.end("Cross-site requests are blocked.");
     }
-    const url = new URL(req.url, origin);
+    const url = new URL(req.url, here);
     if (url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json", ...security });
       return res.end(JSON.stringify({ app: "Casebook Studio Local", version: "0.1.1", local: true }));
@@ -7948,9 +7973,9 @@ async function respond(req, res) {
       const chunks = [];
       for await (const chunk of req) {
         size += chunk.length;
-        if (size > 12 * 1024 * 1024) {
+        if (size > 40 * 1024 * 1024) {
           res.writeHead(413, security);
-          return res.end("Upload exceeds 12 MB request limit.");
+          return res.end("Upload exceeds 40 MB request limit.");
         }
         chunks.push(chunk);
       }

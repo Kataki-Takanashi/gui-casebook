@@ -12,8 +12,8 @@ async function handle(request:Request){try{
   if(method==='GET'){const r=await db().prepare('SELECT id,name,revision,created,updated FROM casebooks WHERE owner=? ORDER BY updated DESC').bind(owner).all();return json(r.results);}
   if(method==='POST'){
    const count=await db().prepare('SELECT COUNT(*) AS n FROM casebooks WHERE owner=?').bind(owner).first();if(count.n>=20)throw Error('The pilot supports up to 20 casebooks per person.');
-   const form=await request.formData(),file=form.get('file');if(!(file instanceof File)||!file.name.toLowerCase().endsWith('.xlsx'))throw Error('Choose a .xlsx casebook.');if(file.size>8*1024*1024)throw Error('Casebooks must be smaller than 8 MB.');
-   const bytes=new Uint8Array(await file.arrayBuffer()),data=parseWorkbook(bytes),parsed=JSON.stringify(data);if(parsed.length>1500000)throw Error('This casebook contains too much data for the pilot.');
+   const form=await request.formData(),file=form.get('file');if(!(file instanceof File)||!file.name.toLowerCase().endsWith('.xlsx'))throw Error('Choose a .xlsx casebook.');if(file.size>30*1024*1024)throw Error('Casebooks must be smaller than 30 MB.');
+   const bytes=new Uint8Array(await file.arrayBuffer()),data=parseWorkbook(bytes),parsed=JSON.stringify(data);if(parsed.length>8000000)throw Error('This casebook contains too much data for the pilot.');
    const id=crypto.randomUUID(),key=owner+'/'+id+'/original.xlsx',created=now();await bucket().put(key,bytes,{httpMetadata:{contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}});
    await db().prepare('INSERT INTO casebooks (id,owner,name,original_key,parsed,edits,revision,created,updated) VALUES (?,?,?,?,?,\'{}\',0,?,?)').bind(id,owner,safeName(file.name),key,parsed,created,created).run();return json({id},201);
   }
