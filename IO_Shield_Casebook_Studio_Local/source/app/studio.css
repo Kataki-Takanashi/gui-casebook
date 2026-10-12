@@ -108,6 +108,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .field{display:flex;flex-direction:column;gap:5px;font-size:13px;min-width:0}
 .field>span{font-weight:550;color:var(--muted-foreground)}
 .field b{color:var(--primary);font-weight:500}
+.field .has-tip{cursor:help;text-decoration:underline dotted;text-decoration-color:var(--input);text-underline-offset:3px;width:max-content}
 .field.wide{grid-column:1/-1}
 .field input,.field textarea{font-size:15px;background:var(--card)}
 .field input{height:38px}

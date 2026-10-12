@@ -26,6 +26,18 @@ const layouts:Record<string,{rows:string[][],more:string[]}>={
  [CLAIMS]:{rows:[['B','C'],['E'],['H'],['K','J'],['D','G']],more:['L','M','Q','R','T','A']},
  [PORTFOLIO]:{rows:[['B','C'],['D'],['E','G'],['M'],['I']],more:['H','A']},
 };
+// Will's own definitions from the casebook template, shown when hovering a field label.
+const fieldTips:Record<string,string>={
+ 'Main Domain':'The technical area where you want the most depth.',
+ 'Support Domain':'A second area that makes the main domain stronger. Add it only when it truly matters.',
+ 'Scope / Permission':'Required for assessment, professional, or investigative work.',
+ 'Time Class':'How well the time is proven. Do not guess old hours.',
+ 'Work Level':'Pick the level you worked at. The reviewer makes the final call.',
+ 'Hours':'Leave blank for T4 and T5.',
+ 'What It Shows':'Write what the proof actually shows, not just the file name.',
+ 'NICE Link':'Draft mapping to the NIST NICE framework. Still being refined.',
+ 'Type':'Parent projects group smaller cases and normally get no extra case credit.',
+};
 // Free-text fields where earlier answers are offered as suggestions.
 const suggestCols:Record<string,string[]>={[CASES]:['J'],[SESSIONS]:['N'],[PROOF]:['K']};
 const longFields=['What I Did','Result','Notes','What I Worked On','What It Shows','Scope / Permission','Fix / Recovery','Privacy / Cleanup'];
@@ -245,5 +257,5 @@ export default function Studio({displayName}:{displayName:string}){
 }
 function SuggestInput({value,onChange,options,label}:{value:string,onChange:(v:string)=>void,options:string[],label:string}){const [open,setOpen]=useState(false);const list=options.filter(o=>o!==value&&o.toLowerCase().includes(value.toLowerCase())).slice(0,8);return <div className="suggest"><Input aria-label={label} value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),120)}/>{open&&list.length>0&&<div className="suggest-list" role="listbox">{list.map(o=><button type="button" role="option" key={o} onMouseDown={e=>{e.preventDefault();onChange(o);setOpen(false);}}>{o}</button>)}</div>}</div>;}
 function Section({title,count,extra,add,addLabel,children}:{title:string,count:number,extra?:string,add:()=>void,addLabel:string,children:React.ReactNode}){return <section className="group"><div className="group-head"><h2>{title}</h2><span className="muted">{count||''}{extra&&count?` · ${extra}`:''}</span><button className="text-btn" onClick={add}><Plus size={14}/>{addLabel}</button></div>{count>0&&<div className="list">{children}</div>}</section>;}
-function Field({label,required=false,wide=false,group=false,children}:{label:string,required?:boolean,wide?:boolean,group?:boolean,children:React.ReactNode}){const Tag=group?'div':'label';return <Tag className={'field '+(wide?'wide':'')}><span>{label}{required&&<b> *</b>}</span>{children}</Tag>;}
+function Field({label,required=false,wide=false,group=false,children}:{label:string,required?:boolean,wide?:boolean,group?:boolean,children:React.ReactNode}){const Tag=group?'div':'label',tip=fieldTips[label];return <Tag className={'field '+(wide?'wide':'')}><span title={tip} className={tip?'has-tip':undefined}>{label}{required&&<b> *</b>}</span>{children}</Tag>;}
 function Stat({label,value}:{label:string,value:string|number}){return <div className="stat"><strong>{value}</strong><span>{label}</span></div>;}
