@@ -53,12 +53,13 @@ h2{font-size:15px;font-weight:600}
 
 /* Groups and rows */
 .group{margin-bottom:28px}
+.case-head~.group{margin-bottom:40px}
 .group-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;min-height:28px}
 .group-head .text-btn{margin-left:auto}
 .list{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.case-row{display:grid;grid-template-columns:96px minmax(0,1fr) minmax(0,200px) auto auto;align-items:center;gap:16px;width:100%;padding:11px 16px;text-align:left;border-top:1px solid var(--border);font-size:14px}
+.case-row{display:grid;grid-template-columns:118px minmax(0,1fr) minmax(0,200px) auto auto;align-items:center;gap:16px;width:100%;padding:11px 16px;text-align:left;border-top:1px solid var(--border);font-size:14px}
 .list>.case-row:first-child{border-top:0}
-.case-row.with-action{grid-template-columns:96px minmax(0,1fr) minmax(0,200px) auto auto 28px;cursor:pointer}
+.case-row.with-action{grid-template-columns:118px minmax(0,1fr) minmax(0,200px) auto auto 28px;cursor:pointer}
 .row-action{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;color:var(--primary);opacity:0}
 .case-row:hover .row-action,.row-action:focus-visible{opacity:1}
 .row-action:hover{background:var(--accent)}
@@ -78,10 +79,10 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .empty{padding:48px 16px;text-align:center;color:var(--muted-foreground);display:flex;flex-direction:column;align-items:center;gap:14px;border:1px dashed var(--border);border-radius:8px}
 
 /* Case page */
-.case-head{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:12px}
+.case-head{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:28px}
 .case-head h1{margin:4px 0 6px}
 .meta-line{font-size:13px;color:var(--muted-foreground);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.case-summary{color:var(--foreground);max-width:720px;margin:0 0 28px;white-space:pre-wrap}
+.case-summary{color:var(--foreground);max-width:720px;margin:-12px 0 32px;white-space:pre-wrap}
 
 /* Import */
 .import{margin:10vh auto 0;max-width:520px;text-align:center;padding:56px 24px;border:1.5px dashed var(--input);border-radius:12px;background:var(--card);display:flex;flex-direction:column;align-items:center;gap:12px}
