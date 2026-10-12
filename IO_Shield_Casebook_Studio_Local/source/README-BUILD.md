@@ -12,6 +12,11 @@ To edit and rebuild:
 5. Run `npm run build`. This rebuilds ../public and ../server.mjs.
 6. Run the launcher in the parent folder.
 
+To make the download zips (Node bundled, nothing for students to install):
+
+1. Run `npm run build`, then `npm run release`.
+2. Upload the three zips in `../../release/` to a new GitHub release.
+
 Data files stay outside source and are not replaced by builds.
 The build uses bundled frontend assets and native Node SQLite/file storage.
 The local auth adapter identifies one local operator; it is not multi-user auth.

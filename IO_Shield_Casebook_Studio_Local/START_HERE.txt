@@ -1,25 +1,24 @@
 I/O SHIELD CASEBOOK STUDIO — LOCAL v0.1.1
 
-This version runs on your own computer. It needs no ChatGPT account,
-cloud storage, subscription, or npm install. After installing Node.js once,
-the app works offline. Browser assets and spreadsheet libraries are bundled.
+This app runs on your own computer and works offline. Nothing to install.
 
-WINDOWS
-1. Extract this ZIP into a permanent, writable folder, such as
-   Documents\IO_Shield_Casebook_Studio. Do not run it inside the ZIP.
-2. Install Node.js 22.13 or newer (24 recommended) from https://nodejs.org/en/download.
-   Alternatively, place a portable Node.js 22.13+ node.exe in runtime\.
-3. Double-click Start_Casebook_Windows.cmd.
-4. Your default browser opens http://127.0.0.1:8765 (localhost:8765 also works).
-   If it does not open automatically, paste that address into your browser.
-5. Keep the launcher window open while working. Press Ctrl+C to stop.
+1. Download the zip for your computer (Windows, Mac, or Linux).
+2. Unzip it into a folder you keep, such as Documents. Do not run it from
+   inside the zip.
+3. Double-click the Start file:
+   Windows: Start_Casebook_Windows.cmd
+     If Windows says it protected your PC, click More info, then Run anyway.
+   Mac: Start_Casebook_Mac_Linux.command
+     If macOS blocks it the first time, open System Settings, go to
+     Privacy & Security, scroll down, and click Open Anyway.
+   Linux: run sh Start_Casebook_Mac_Linux.command in a terminal.
+4. Your browser opens http://127.0.0.1:8765 (localhost:8765 also works).
+   If it does not, paste that address into your browser.
+5. Keep the launcher window open while working. Close it to stop the app.
 
-MAC / LINUX
-Install Node.js 22.13 or newer. In a terminal opened in the extracted folder,
-run: node server.mjs --open
-The included .command launcher is also available; macOS may require permission
-to execute a downloaded script. It can be launched from Terminal with:
-sh Start_Casebook_Mac_Linux.command
+Copied the app from source instead of a download? It needs Node.js 22.13
+or newer from https://nodejs.org/en/download. The launchers use it
+automatically when there is no runtime folder.
 
 USING YOUR CASEBOOK
 - Drop your casebook .xlsx on the start page, or use the casebook menu
