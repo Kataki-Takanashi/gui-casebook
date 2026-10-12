@@ -57,6 +57,10 @@ h2{font-size:15px;font-weight:600}
 .list{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden}
 .case-row{display:grid;grid-template-columns:96px minmax(0,1fr) minmax(0,200px) auto auto;align-items:center;gap:16px;width:100%;padding:11px 16px;text-align:left;border-top:1px solid var(--border);font-size:14px}
 .list>.case-row:first-child{border-top:0}
+.case-row.with-action{grid-template-columns:96px minmax(0,1fr) minmax(0,200px) auto auto 28px;cursor:pointer}
+.row-action{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;color:var(--primary);opacity:0}
+.case-row:hover .row-action,.row-action:focus-visible{opacity:1}
+.row-action:hover{background:var(--accent)}
 button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .case-row>.muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .case-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
@@ -65,7 +69,10 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .badge.ok{background:#e3f3ee;color:#11634f}
 .dark .badge.ok{background:#173a30;color:#7fd6b6}
 .dark .error-banner,.dark .form-error{background:#3a1a20;border-color:#6b2a35;color:#ffb3bd}
-.theme-btn{margin:auto 8px 12px;display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:13px;color:var(--muted-foreground)}
+.theme-btn{margin:auto 8px 12px;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--muted-foreground)}
+[data-collapsible=icon] .brand strong{display:none}
+[data-collapsible=icon] .brand{justify-content:center;padding:18px 0 14px}
+[data-collapsible=icon] [data-sidebar=menu]{padding:0 8px}
 .theme-btn:hover{background:var(--sidebar-accent);color:var(--foreground)}
 .empty{padding:48px 16px;text-align:center;color:var(--muted-foreground);display:flex;flex-direction:column;align-items:center;gap:14px;border:1px dashed var(--border);border-radius:8px}
 
@@ -146,6 +153,8 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
  .case-row{grid-template-columns:1fr auto;gap:4px 12px}
  .case-row>.mono{grid-column:1/-1}
  .case-row>.muted:not(.num){display:none}
+ .case-row.with-action{grid-template-columns:1fr auto auto}
+ .row-action{opacity:1}
  .form-grid,.form-row{grid-template-columns:1fr!important}
  .field.wide{grid-column:auto}
  .book-menu{max-width:140px}
