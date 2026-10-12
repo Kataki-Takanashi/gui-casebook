@@ -37,6 +37,7 @@ const fieldTips:Record<string,string>={
  'What It Shows':'Write what the proof actually shows, not just the file name.',
  'NICE Link':'Draft mapping to the NIST NICE framework. Still being refined.',
  'Type':'Parent projects group smaller cases and normally get no extra case credit.',
+ 'Context':'Label practice work. Training and simulation stay clearly marked.',
 };
 // Free-text fields where earlier answers are offered as suggestions.
 const suggestCols:Record<string,string[]>={[CASES]:['J'],[SESSIONS]:['N'],[PROOF]:['K']};
