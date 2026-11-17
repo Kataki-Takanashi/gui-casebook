@@ -371,10 +371,10 @@ var require_errors = __commonJS({
       INVALID_NODE_TYPE_ERR: 24,
       DATA_CLONE_ERR: 25
     };
-    var entries = Object.entries(ExceptionCode);
-    for (i = 0; i < entries.length; i++) {
-      key = entries[i][0];
-      DOMException[key] = entries[i][1];
+    var entries2 = Object.entries(ExceptionCode);
+    for (i = 0; i < entries2.length; i++) {
+      key = entries2[i][0];
+      DOMException[key] = entries2[i][1];
     }
     var key;
     var i;
@@ -818,13 +818,13 @@ var require_dom = __commonJS({
       }
     };
     NodeList.prototype[Symbol.iterator] = function() {
-      var me = this;
+      var me2 = this;
       var index = 0;
       return {
         next: function() {
-          if (index < me.length) {
+          if (index < me2.length) {
             return {
-              value: me[index++],
+              value: me2[index++],
               done: false
             };
           } else {
@@ -879,12 +879,12 @@ var require_dom = __commonJS({
         i++;
       }
     }
-    function _nnmBucket(map, namespaceURI, create) {
+    function _nnmBucket(map, namespaceURI, create2) {
       if (!namespaceURI) {
         return map._noNsIndex;
       }
       var bucket2 = map._nsIndex[namespaceURI];
-      if (!bucket2 && create) {
+      if (!bucket2 && create2) {
         bucket2 = map._nsIndex[namespaceURI] = /* @__PURE__ */ Object.create(null);
       }
       return bucket2;
@@ -1081,13 +1081,13 @@ var require_dom = __commonJS({
       }
     };
     NamedNodeMap.prototype[Symbol.iterator] = function() {
-      var me = this;
+      var me2 = this;
       var index = 0;
       return {
         next: function() {
-          if (index < me.length) {
+          if (index < me2.length) {
             return {
-              value: me[index++],
+              value: me2[index++],
               done: false
             };
           } else {
@@ -6535,7 +6535,22 @@ if (version === 0) {
     throw e;
   }
 }
-if (version > 1) throw Error("This data folder needs a newer Casebook Studio release.");
+if (version < 2) {
+  database.exec("BEGIN");
+  try {
+    database.exec(`
+CREATE TABLE IF NOT EXISTS app_settings (key text PRIMARY KEY NOT NULL, value text NOT NULL);
+CREATE TABLE IF NOT EXISTS kimai_case_map (book_id text NOT NULL, case_id text NOT NULL, project integer NOT NULL, activity integer NOT NULL, PRIMARY KEY (book_id, case_id));
+CREATE TABLE IF NOT EXISTS kimai_links (book_id text NOT NULL, session_id text NOT NULL, kimai_id integer NOT NULL, synced text NOT NULL, PRIMARY KEY (book_id, session_id));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kimai_links_entry ON kimai_links (book_id, kimai_id);
+PRAGMA user_version=2;`);
+    database.exec("COMMIT");
+  } catch (e) {
+    database.exec("ROLLBACK");
+    throw e;
+  }
+}
+if (version > 2) throw Error("This data folder needs a newer Casebook Studio release.");
 var prepared = (sql, values = []) => ({ bind(...v) {
   return prepared(sql, v);
 }, async run() {
@@ -7611,6 +7626,14 @@ function rowsFor(data, edits, sheet) {
   for (const [n, v] of Object.entries(edits[sheet] ?? {})) out.set(+n, { row: +n, values: { ...out.get(+n)?.values, ...v } });
   return [...out.values()].filter((r) => r.values.A).sort((a, b) => a.row - b.row);
 }
+function excelDate(value) {
+  if (!value) return "";
+  if (/^\d+(\.\d+)?$/.test(value)) {
+    const n = Number(value);
+    if (n > 1 && n < 1e5) return new Date(Date.UTC(1899, 11, 30) + n * 864e5).toISOString().slice(0, 10);
+  }
+  return value.slice(0, 10);
+}
 function dateSerial(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   return String(Math.round((Date.parse(value + "T00:00:00Z") - Date.UTC(1899, 11, 30)) / 864e5));
@@ -7642,6 +7665,31 @@ function validateEntry(data, edits, sheet, row, values) {
     if (proofIds.some((id) => !known.some((r) => r.values.A === id && r.values.B === values.B))) throw Error("Every proof ID must belong to the selected case.");
   }
   return current;
+}
+function domainCode(value) {
+  const v = (value ?? "").trim();
+  return /^\d+(\.0+)?$/.test(v) ? String(parseInt(v, 10)).padStart(2, "0") : v;
+}
+function clockTime(value) {
+  const v = (value ?? "").trim();
+  if (!v) return "";
+  if (/^0?\.\d+$|^0$/.test(v)) {
+    const m2 = Math.round(+v * 1440);
+    return `${String(Math.floor(m2 / 60) % 24).padStart(2, "0")}:${String(m2 % 60).padStart(2, "0")}`;
+  }
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?$/.exec(v);
+  if (!m) return "";
+  let h = +m[1];
+  if (m[3]) {
+    h = h % 12 + (/p/i.test(m[3]) ? 12 : 0);
+  }
+  return h < 24 && +m[2] < 60 ? `${String(h).padStart(2, "0")}:${m[2]}` : "";
+}
+function nextNumberedId(ids, prefix) {
+  const used = new Set(ids);
+  let n = Math.max(0, ...ids.filter((id) => id.startsWith(prefix)).map((id) => +(/(\d+)$/.exec(id.slice(prefix.length))?.[1] ?? 0))) + 1;
+  while (used.has(prefix + String(n).padStart(3, "0"))) n++;
+  return prefix + String(n).padStart(3, "0");
 }
 
 // lib/workbook.ts
@@ -7799,10 +7847,371 @@ function columnNumber(col) {
   return [...col].reduce((v, c) => v * 26 + c.charCodeAt(0) - 64, 0);
 }
 
+// lib/kimai.ts
+var KimaiError = class extends Error {
+  constructor(message, status = 0) {
+    super(message);
+    this.status = status;
+  }
+  status;
+};
+async function call(cfg, path3, init = {}) {
+  let r;
+  try {
+    r = await fetch(cfg.url.replace(/\/+$/, "") + path3, { ...init, headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/json", ...init.body ? { "Content-Type": "application/json" } : {} }, signal: AbortSignal.timeout(12e3) });
+  } catch {
+    throw new KimaiError("Kimai is not reachable right now.");
+  }
+  const text2 = await r.text();
+  if (r.status === 401 || r.status === 403) throw new KimaiError("Kimai did not accept this API token.", r.status);
+  if (r.status >= 500 || !(r.headers.get("content-type") ?? "").includes("json") && text2) throw new KimaiError("Kimai is not reachable right now.", r.status);
+  if (!r.ok) {
+    let message = `Kimai said no (${r.status}).`;
+    try {
+      const e = JSON.parse(text2);
+      message = e.message ?? message;
+    } catch {
+    }
+    throw new KimaiError(message, r.status);
+  }
+  return { body: text2 ? JSON.parse(text2) : null, headers: r.headers };
+}
+var local = (s) => ({ date: s.slice(0, 10), time: s.slice(11, 16) });
+function toEntry(raw) {
+  if (!raw?.end) return null;
+  const b = local(raw.begin), e = local(raw.end), p = raw.project ?? {}, a = raw.activity ?? {};
+  return {
+    id: raw.id,
+    date: b.date,
+    start: b.time,
+    end: e.time,
+    hours: String(Math.round((raw.duration ?? 0) / 36) / 100),
+    project: typeof p === "object" ? p.id : p,
+    projectName: typeof p === "object" ? p.name ?? "" : "",
+    activity: typeof a === "object" ? a.id : a,
+    activityName: typeof a === "object" ? a.name ?? "" : "",
+    description: raw.description ?? ""
+  };
+}
+var entryFields = (e) => ({ date: e.date, start: e.start, end: e.end, description: e.description, project: e.project, activity: e.activity });
+async function me(cfg) {
+  const { body } = await call(cfg, "/api/users/me");
+  return { id: body.id, name: body.alias || body.username };
+}
+async function catalog(cfg) {
+  const [p, a] = await Promise.all([call(cfg, "/api/projects?visible=1"), call(cfg, "/api/activities?visible=1")]);
+  return { projects: p.body.map((x) => ({ id: x.id, name: x.name })), activities: a.body.map((x) => ({ id: x.id, name: x.name, project: x.project ?? null })) };
+}
+async function entries(cfg, since) {
+  const out = [];
+  for (let page = 1; page <= 20; page++) {
+    const { body, headers } = await call(cfg, `/api/timesheets?full=true&size=250&page=${page}&begin=${since}T00:00:00&order=ASC&orderBy=begin`);
+    for (const raw of body) {
+      const e = toEntry(raw);
+      if (e) out.push(e);
+    }
+    if (page >= +(headers.get("x-total-pages") ?? 1)) break;
+  }
+  return out;
+}
+async function entry(cfg, id) {
+  try {
+    const { body } = await call(cfg, `/api/timesheets/${id}`);
+    return toEntry(body);
+  } catch (e) {
+    if (e instanceof KimaiError && e.status === 404) return null;
+    throw e;
+  }
+}
+function payload(f) {
+  const endDate = f.end <= f.start ? new Date(Date.parse(f.date + "T00:00:00Z") + 864e5).toISOString().slice(0, 10) : f.date;
+  return JSON.stringify({ begin: `${f.date}T${f.start}:00`, end: `${endDate}T${f.end}:00`, project: f.project, activity: f.activity, description: f.description });
+}
+async function create(cfg, f) {
+  const { body } = await call(cfg, "/api/timesheets", { method: "POST", body: payload(f) });
+  return toEntry(body);
+}
+async function update(cfg, id, f) {
+  const { body } = await call(cfg, `/api/timesheets/${id}`, { method: "PATCH", body: payload(f) });
+  return toEntry(body);
+}
+
 // app/api/[...path]/route.ts
 var safeName = (v) => v.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 140) || "file";
 var now = () => (/* @__PURE__ */ new Date()).toISOString();
 var json = (data, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
+async function saveEntry(b, owner, sheet, row, values, source) {
+  const data = JSON.parse(b.parsed), edits = JSON.parse(b.edits);
+  const current = validateEntry(data, edits, sheet, row, values), old = current?.values ?? {}, defaults = {};
+  if (sheet === "Case Register") Object.assign(defaults, { L: "Pending Review", M: values.D === "Parent Project" ? "0" : "1", U: "No", S: "", T: "" });
+  if (sheet === "Competency Evidence") Object.assign(defaults, { N: "Pending Review", S: "No", O: "", P: "", U: "0.01", V: "" });
+  if (sheet === "Evidence Index") Object.assign(defaults, { L: "", M: "" });
+  if (sheet === "Portfolio") Object.assign(defaults, { F: "Private", J: "Pending Review", K: "", L: "" });
+  const updated = { ...values, ...defaults };
+  edits[sheet] ??= {};
+  edits[sheet][row] = { ...edits[sheet][row], ...updated };
+  const cascades = [];
+  if (current && ["Case Register", "Session Ledger", "Evidence Index"].includes(sheet)) {
+    const caseId = sheet === "Case Register" ? values.A : sheet === "Session Ledger" ? values.C : values.B;
+    for (const claim of rowsFor(data, edits, "Competency Evidence").filter((r) => r.values.B === caseId)) {
+      if (sheet === "Evidence Index" && !claim.values.H?.split(/[,;\s]+/).includes(values.A)) continue;
+      const patch = { N: "Pending Review", S: "No", O: "", P: "", V: "" };
+      edits["Competency Evidence"] ??= {};
+      edits["Competency Evidence"][claim.row] = { ...edits["Competency Evidence"][claim.row], ...patch };
+      cascades.push({ sheet: "Competency Evidence", row: claim.row, before: claim.values, after: patch });
+    }
+    for (const item of rowsFor(data, edits, "Portfolio").filter((r) => r.values.B === caseId)) {
+      const patch = { J: "Pending Review", F: "Private", K: "", L: "" };
+      edits.Portfolio ??= {};
+      edits.Portfolio[item.row] = { ...edits.Portfolio[item.row], ...patch };
+      cascades.push({ sheet: "Portfolio", row: item.row, before: item.values, after: patch });
+    }
+    if (sheet !== "Case Register") {
+      const c = rowsFor(data, edits, "Case Register").find((r) => r.values.A === caseId);
+      if (c) {
+        const patch = { L: "Pending Review", U: "No", S: "", T: "" };
+        edits["Case Register"] ??= {};
+        edits["Case Register"][c.row] = { ...edits["Case Register"][c.row], ...patch };
+        cascades.push({ sheet: "Case Register", row: c.row, before: c.values, after: patch });
+      }
+    }
+  }
+  const timestamp = now(), revision = b.revision + 1;
+  const results = await db().batch([
+    db().prepare("UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?").bind(JSON.stringify(edits), timestamp, b.id, owner, b.revision),
+    db().prepare("INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(), b.id, owner, revision, JSON.stringify({ sheet, row, before: old, after: updated, cascades, ...source ? { source } : {} }), timestamp)
+  ]);
+  if (results[0].meta.changes !== 1) throw json({ error: "Another update arrived first. Reload before saving." }, 409);
+  b.revision = revision;
+  b.edits = JSON.stringify(edits);
+  b.updated = timestamp;
+  return { revision, edits, updated: timestamp };
+}
+var SESSIONS = "Session Ledger";
+var WINDOW_DAYS = 120;
+async function setting(key) {
+  return (await db().prepare("SELECT value FROM app_settings WHERE key=?").bind(key).first())?.value;
+}
+async function setSetting(key, value) {
+  if (value === null) await db().prepare("DELETE FROM app_settings WHERE key=?").bind(key).run();
+  else await db().prepare("INSERT INTO app_settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(key, value).run();
+}
+async function kimaiConfig() {
+  const url = await setting("kimai_url"), token = await setting("kimai_token");
+  return url && token ? { url, token } : null;
+}
+async function caseMap(bookId) {
+  const r = await db().prepare("SELECT case_id,project,activity FROM kimai_case_map WHERE book_id=?").bind(bookId).all();
+  return Object.fromEntries(r.results.map((m) => [m.case_id, { project: m.project, activity: m.activity }]));
+}
+async function links(bookId) {
+  const r = await db().prepare("SELECT session_id,kimai_id,synced FROM kimai_links WHERE book_id=?").bind(bookId).all();
+  return r.results.map((l) => ({ ...l, synced: JSON.parse(l.synced) }));
+}
+async function saveLink(bookId, sessionId, kimaiId, app, kimai) {
+  await db().prepare("INSERT INTO kimai_links (book_id,session_id,kimai_id,synced) VALUES (?,?,?,?) ON CONFLICT(book_id,session_id) DO UPDATE SET kimai_id=excluded.kimai_id,synced=excluded.synced").bind(bookId, sessionId, kimaiId, JSON.stringify({ app, kimai })).run();
+}
+var same = (a, b) => a.date === b.date && a.start === b.start && a.end === b.end && a.description === b.description && a.project === b.project && a.activity === b.activity;
+var sinceDate = () => new Date(Date.now() - WINDOW_DAYS * 864e5).toISOString().slice(0, 10);
+function sessionRows(b) {
+  return rowsFor(JSON.parse(b.parsed), JSON.parse(b.edits), SESSIONS);
+}
+function appFields(row, map, fallback) {
+  const v = row.values, target = map[v.C] ?? (fallback && { project: fallback.project, activity: fallback.activity });
+  const date = excelDate(v.B), start = clockTime(v.J), end = clockTime(v.K);
+  if (!target || !date || !start || !end) return null;
+  return { date, start, end, description: v.D ?? "", project: target.project, activity: target.activity };
+}
+async function pullInto(b, owner, row, e) {
+  const values = { ...row.values, B: e.date, J: e.start, K: e.end, L: e.hours, D: e.description || row.values.D };
+  for (const k of Object.keys(values)) if (!["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "N", "O", "P", "R"].includes(k)) delete values[k];
+  await saveEntry(b, owner, SESSIONS, row.row, values, "kimai");
+}
+async function kimaiStatus(b, owner, apply) {
+  const cfg = await kimaiConfig();
+  if (!cfg) return { connected: false };
+  const since = sinceDate(), remote = await entries(cfg, since), byId = new Map(remote.map((e) => [e.id, e]));
+  const map = await caseMap(b.id), linkList = await links(b.id), linkedIds = new Set(linkList.map((l) => l.kimai_id)), linkedSessions = new Set(linkList.map((l) => l.session_id));
+  const conflicts = [], missing = [];
+  let pulled = 0, pushed = 0;
+  for (const l of linkList) {
+    let e = byId.get(l.kimai_id) ?? null;
+    if (!e && linkList.length <= 200) e = await entry(cfg, l.kimai_id);
+    const row = sessionRows(b).find((r) => r.values.A === l.session_id);
+    if (!e || !row) {
+      missing.push({ session_id: l.session_id, kimai_id: l.kimai_id, reason: !e ? "kimai" : "casebook" });
+      continue;
+    }
+    const app = appFields(row, map, l.synced.kimai), kimai = entryFields(e);
+    if (!app) continue;
+    const appChanged = !same(app, l.synced.app), kimaiChanged = !same(kimai, l.synced.kimai);
+    if (appChanged && kimaiChanged) {
+      conflicts.push({ session_id: l.session_id, kimai_id: l.kimai_id, app, kimai });
+      continue;
+    }
+    if (!apply) continue;
+    if (kimaiChanged) {
+      await pullInto(b, owner, row, e);
+      const after = sessionRows(b).find((r) => r.values.A === l.session_id);
+      await saveLink(b.id, l.session_id, e.id, appFields(after, map, kimai), kimai);
+      pulled++;
+    } else if (appChanged) {
+      const u = await update(cfg, e.id, app);
+      await saveLink(b.id, l.session_id, e.id, app, entryFields(u));
+      pushed++;
+    }
+  }
+  const rows = sessionRows(b), cases = rowsFor(JSON.parse(b.parsed), JSON.parse(b.edits), "Case Register");
+  const words = (t) => new Set((t.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []).filter((w) => !["the", "and", "project", "case"].includes(w)));
+  const byName = (e) => {
+    const k = words(e.projectName + " " + e.activityName);
+    let best = "", score = 0;
+    for (const c of cases) {
+      if (c.values.D === "Parent Project") continue;
+      const n = [...words(c.values.C ?? "")].filter((w) => k.has(w)).length;
+      if (n > score) {
+        score = n;
+        best = c.values.A;
+      }
+    }
+    return best;
+  };
+  const suggest = (e) => Object.entries(map).find(([, m]) => m.project === e.project && m.activity === e.activity)?.[0] ?? Object.entries(map).find(([, m]) => m.project === e.project)?.[0] ?? byName(e);
+  const fresh = remote.filter((e) => !linkedIds.has(e.id)).map((e) => {
+    const match = rows.find((r) => !linkedSessions.has(r.values.A) && excelDate(r.values.B) === e.date && clockTime(r.values.J) === e.start);
+    return { ...e, suggested_case: match?.values.C ?? suggest(e), match_session: match?.values.A ?? null };
+  });
+  const matched = new Set(fresh.map((f) => f.match_session).filter(Boolean));
+  const toSend = rows.filter((r) => !linkedSessions.has(r.values.A) && !matched.has(r.values.A) && ["T1", "T2", "T3"].includes(r.values.I) && map[r.values.C] && excelDate(r.values.B) >= since && clockTime(r.values.J) && clockTime(r.values.K)).map((r) => ({ session_id: r.values.A, case_id: r.values.C, date: excelDate(r.values.B), start: clockTime(r.values.J), end: clockTime(r.values.K), description: r.values.D }));
+  const syncedAt = (/* @__PURE__ */ new Date()).toISOString();
+  if (apply) await setSetting("kimai_synced_" + b.id, syncedAt);
+  return { connected: true, user: await setting("kimai_user"), synced: apply ? syncedAt : await setting("kimai_synced_" + b.id), pulled, pushed, new: fresh, to_send: toSend, conflicts, missing, map, linked: [...linkedSessions], cases: cases.filter((c) => c.values.D !== "Parent Project").map((c) => ({ id: c.values.A, name: c.values.C })) };
+}
+async function afterSessionSave(b, sessionId, create2) {
+  const cfg = await kimaiConfig();
+  if (!cfg) return void 0;
+  try {
+    const row = sessionRows(b).find((r) => r.values.A === sessionId), map = await caseMap(b.id), link = (await links(b.id)).find((l) => l.session_id === sessionId);
+    if (link) {
+      const app2 = appFields(row, map, link.synced.kimai);
+      if (!app2 || same(app2, link.synced.app)) return { status: "linked" };
+      const remote = await entry(cfg, link.kimai_id);
+      if (!remote) return { status: "missing" };
+      if (!same(entryFields(remote), link.synced.kimai)) return { status: "conflict" };
+      const u = await update(cfg, link.kimai_id, app2);
+      await saveLink(b.id, sessionId, link.kimai_id, app2, entryFields(u));
+      return { status: "updated" };
+    }
+    if (!create2) return void 0;
+    const app = appFields(row, map);
+    if (!app) return { status: "unmapped" };
+    const e = await create(cfg, app);
+    await saveLink(b.id, sessionId, e.id, app, entryFields(e));
+    return { status: "created", kimai_id: e.id };
+  } catch (e) {
+    return { status: "error", error: e.message };
+  }
+}
+function importValues(b, e, caseId) {
+  const data = JSON.parse(b.parsed), edits = JSON.parse(b.edits), rows = rowsFor(data, edits, SESSIONS), c = rowsFor(data, edits, "Case Register").find((r) => r.values.A === caseId);
+  if (!c) throw Error("Choose a case for each Kimai entry.");
+  const last = [...rows].reverse().find((r) => r.values.C === caseId)?.values ?? {};
+  let row = 5;
+  while (rows.some((r) => r.row === row)) row++;
+  return { row, values: { A: nextNumberedId(rows.map((r) => r.values.A), `${caseId}-S`), B: e.date, C: caseId, D: e.description || e.activityName || "Kimai entry", E: last.E || "Practical", F: c.values.E || "Internal Project", G: domainCode(c.values.H ?? "") || "01", H: domainCode(c.values.I ?? ""), I: "T1", J: e.start, K: e.end, L: e.hours, N: last.N || "", O: "", P: last.P || "1", R: "" } };
+}
+async function kimaiRoute(path3, method, request, owner) {
+  if (path3[0] === "kimai") {
+    if (!path3[1] && method === "GET") {
+      const url = await setting("kimai_url"), token = await setting("kimai_token");
+      return json({ connected: !!(url && token), url: url ?? "https://clock.ioshield.io", user: await setting("kimai_user") ?? null });
+    }
+    if (!path3[1] && method === "PUT") {
+      const body2 = await request.json(), url = String(body2.url ?? "").trim().replace(/\/+$/, "");
+      if (!/^https?:\/\/[^\s/]+/.test(url)) throw Error("Enter the Kimai address, like https://clock.ioshield.io.");
+      const token = String(body2.token ?? "").trim() || await setting("kimai_token");
+      if (!token) throw Error("Paste your Kimai API token.");
+      const user = await me({ url, token });
+      await setSetting("kimai_url", url);
+      await setSetting("kimai_token", token);
+      await setSetting("kimai_user", user.name);
+      return json({ connected: true, url, user: user.name });
+    }
+    if (path3[1] === "disconnect" && method === "POST") {
+      await setSetting("kimai_token", null);
+      await setSetting("kimai_user", null);
+      return json({ connected: false });
+    }
+    if (path3[1] === "catalog" && method === "GET") {
+      const cfg2 = await kimaiConfig();
+      if (!cfg2) throw Error("Connect Kimai first.");
+      return json(await catalog(cfg2));
+    }
+    return null;
+  }
+  if (path3[0] !== "books" || path3[2] !== "kimai") return null;
+  const b = await owned(path3[1], owner);
+  if (!path3[3] && method === "GET") return json(await kimaiStatus(b, owner, false));
+  if (path3[3] === "sync" && method === "POST") return json(await kimaiStatus(b, owner, true));
+  const cfg = await kimaiConfig();
+  if (!cfg) throw Error("Connect Kimai first.");
+  const body = await request.json();
+  if (path3[3] === "map" && method === "PUT") {
+    if (!body.case_id || !Number.isInteger(body.project) || !Number.isInteger(body.activity)) throw Error("Choose a Kimai project and activity.");
+    await db().prepare("INSERT INTO kimai_case_map (book_id,case_id,project,activity) VALUES (?,?,?,?) ON CONFLICT(book_id,case_id) DO UPDATE SET project=excluded.project,activity=excluded.activity").bind(b.id, body.case_id, body.project, body.activity).run();
+    return json({ map: await caseMap(b.id) });
+  }
+  if (path3[3] === "import" && method === "POST") {
+    let done = 0;
+    for (const item of (body.items ?? []).slice(0, 200)) {
+      const e = await entry(cfg, +item.kimai_id);
+      if (!e) continue;
+      if (await db().prepare("SELECT 1 FROM kimai_links WHERE book_id=? AND kimai_id=?").bind(b.id, e.id).first()) continue;
+      let sessionId = item.link_session;
+      if (!sessionId) {
+        const { row: row2, values } = importValues(b, e, item.case_id);
+        await saveEntry(b, owner, SESSIONS, row2, values, "kimai");
+        sessionId = values.A;
+      }
+      const map = await caseMap(b.id), caseId = sessionRows(b).find((r) => r.values.A === sessionId)?.values.C;
+      if (caseId && !map[caseId]) {
+        await db().prepare("INSERT INTO kimai_case_map (book_id,case_id,project,activity) VALUES (?,?,?,?)").bind(b.id, caseId, e.project, e.activity).run();
+        map[caseId] = { project: e.project, activity: e.activity };
+      }
+      const row = sessionRows(b).find((r) => r.values.A === sessionId);
+      await saveLink(b.id, sessionId, e.id, appFields(row, map, entryFields(e)) ?? entryFields(e), entryFields(e));
+      done++;
+    }
+    return json({ imported: done, revision: b.revision, edits: JSON.parse(b.edits), updated: b.updated });
+  }
+  if (path3[3] === "send" && method === "POST") {
+    const r = await afterSessionSave(b, String(body.session_id), true);
+    if (r?.status === "error") throw Error(r.error);
+    return json(r ?? {});
+  }
+  if (path3[3] === "resolve" && method === "POST") {
+    const link = (await links(b.id)).find((l) => l.session_id === body.session_id);
+    if (!link) throw Error("That session is not linked to Kimai.");
+    if (body.keep === "unlink") {
+      await db().prepare("DELETE FROM kimai_links WHERE book_id=? AND session_id=?").bind(b.id, link.session_id).run();
+      return json({ ok: true });
+    }
+    const e = await entry(cfg, link.kimai_id);
+    if (!e) throw Error("That Kimai entry no longer exists.");
+    const map = await caseMap(b.id), row = sessionRows(b).find((r) => r.values.A === link.session_id);
+    if (body.keep === "kimai") {
+      await pullInto(b, owner, row, e);
+      const after = sessionRows(b).find((r) => r.values.A === link.session_id);
+      await saveLink(b.id, link.session_id, e.id, appFields(after, map, entryFields(e)), entryFields(e));
+    } else {
+      const app = appFields(row, map, link.synced.kimai);
+      const u = await update(cfg, e.id, app);
+      await saveLink(b.id, link.session_id, e.id, app, entryFields(u));
+    }
+    return json({ ok: true, revision: b.revision, edits: JSON.parse(b.edits), updated: b.updated });
+  }
+  return null;
+}
 async function handle(request) {
   try {
     const owner = await identity(), path3 = new URL(request.url).pathname.split("/").slice(2), method = request.method;
@@ -7810,6 +8219,8 @@ async function handle(request) {
       const origin2 = request.headers.get("origin");
       if (origin2 && origin2 !== new URL(request.url).origin) throw new Response("Cross-site writes are not allowed.", { status: 403 });
     }
+    const kimaiResponse = await kimaiRoute(path3, method, request, owner);
+    if (kimaiResponse) return kimaiResponse;
     if (path3[0] === "books" && !path3[1]) {
       if (method === "GET") {
         const r = await db().prepare("SELECT id,name,revision,created,updated FROM casebooks WHERE owner=? ORDER BY updated DESC").bind(owner).all();
@@ -7854,47 +8265,9 @@ async function handle(request) {
       if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload before saving; your form stays open." }, 409);
       const { sheet, row, values } = body;
       if (!values || typeof values !== "object") throw Error("Entry fields are missing.");
-      const current = validateEntry(data, edits, sheet, row, values), old = current?.values ?? {}, defaults = {};
-      if (sheet === "Case Register") Object.assign(defaults, { L: "Pending Review", M: values.D === "Parent Project" ? "0" : "1", U: "No", S: "", T: "" });
-      if (sheet === "Competency Evidence") Object.assign(defaults, { N: "Pending Review", S: "No", O: "", P: "", U: "0.01", V: "" });
-      if (sheet === "Evidence Index") Object.assign(defaults, { L: "", M: "" });
-      if (sheet === "Portfolio") Object.assign(defaults, { F: "Private", J: "Pending Review", K: "", L: "" });
-      const updated = { ...values, ...defaults };
-      edits[sheet] ??= {};
-      edits[sheet][row] = { ...edits[sheet][row], ...updated };
-      const cascades = [];
-      if (current && ["Case Register", "Session Ledger", "Evidence Index"].includes(sheet)) {
-        const caseId = sheet === "Case Register" ? values.A : sheet === "Session Ledger" ? values.C : values.B;
-        for (const claim of rowsFor(data, edits, "Competency Evidence").filter((r) => r.values.B === caseId)) {
-          if (sheet === "Evidence Index" && !claim.values.H?.split(/[,;\s]+/).includes(values.A)) continue;
-          const patch = { N: "Pending Review", S: "No", O: "", P: "", V: "" };
-          edits["Competency Evidence"] ??= {};
-          edits["Competency Evidence"][claim.row] = { ...edits["Competency Evidence"][claim.row], ...patch };
-          cascades.push({ sheet: "Competency Evidence", row: claim.row, before: claim.values, after: patch });
-        }
-        for (const item of rowsFor(data, edits, "Portfolio").filter((r) => r.values.B === caseId)) {
-          const patch = { J: "Pending Review", F: "Private", K: "", L: "" };
-          edits.Portfolio ??= {};
-          edits.Portfolio[item.row] = { ...edits.Portfolio[item.row], ...patch };
-          cascades.push({ sheet: "Portfolio", row: item.row, before: item.values, after: patch });
-        }
-        if (sheet !== "Case Register") {
-          const c = rowsFor(data, edits, "Case Register").find((r) => r.values.A === caseId);
-          if (c) {
-            const patch = { L: "Pending Review", U: "No", S: "", T: "" };
-            edits["Case Register"] ??= {};
-            edits["Case Register"][c.row] = { ...edits["Case Register"][c.row], ...patch };
-            cascades.push({ sheet: "Case Register", row: c.row, before: c.values, after: patch });
-          }
-        }
-      }
-      const timestamp = now(), revision = b.revision + 1;
-      const results = await db().batch([
-        db().prepare("UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?").bind(JSON.stringify(edits), timestamp, b.id, owner, b.revision),
-        db().prepare("INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(), b.id, owner, revision, JSON.stringify({ sheet, row, before: old, after: updated, cascades }), timestamp)
-      ]);
-      if (results[0].meta.changes !== 1) return json({ error: "Another update arrived first. Reload before saving." }, 409);
-      return json({ revision, edits, updated: timestamp });
+      const saved = await saveEntry(b, owner, sheet, row, values);
+      const kimai = sheet === "Session Ledger" ? await afterSessionSave(b, values.A, !!body.kimai) : void 0;
+      return json({ ...saved, kimai });
     }
     if (path3[2] === "files" && method === "POST") {
       const totals = await db().prepare("SELECT SUM(bytes) AS bytes,COUNT(*) AS n FROM proof_files WHERE book_id=?").bind(b.id).first(), form = await request.formData(), f = form.get("file");

@@ -162,3 +162,17 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
  .field.wide{grid-column:auto}
  .book-menu{max-width:140px}
 }
+
+/* Kimai */
+.kimai-bar{display:flex;align-items:center;gap:10px;margin:-16px 0 28px;font-size:13px;color:var(--muted-foreground)}
+.kimai-bar>span:first-of-type{color:var(--foreground)}
+.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+.review-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,220px) auto auto;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--border)}
+.list>.review-row:first-child{border-top:0}
+.review-row>div{display:flex;flex-direction:column;min-width:0}
+.review-row strong{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.map-row{display:grid;grid-template-columns:118px minmax(0,1fr) minmax(0,260px);gap:12px;align-items:center;padding:8px 14px;border-top:1px solid var(--border)}
+.list>.map-row:first-child{border-top:0}
+.chip.fit{width:max-content}
+.tutorial img{max-width:100%;border:1px solid var(--border);border-radius:8px;margin-top:8px}
+@media(max-width:760px){.review-row,.map-row{grid-template-columns:1fr}}

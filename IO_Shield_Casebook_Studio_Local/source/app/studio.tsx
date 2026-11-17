@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Upload,Plus,Download,FolderOpen,Clock,FileCheck,Layers,Briefcase,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil,Sun,Moon} from 'lucide-react';
+import {Upload,Plus,Download,FolderOpen,Clock,FileCheck,Layers,Briefcase,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil,Sun,Moon,RefreshCw,Link2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
@@ -21,7 +21,7 @@ const caseCol=(sheet:string)=>sheet===SESSIONS?'C':'B';
 // Form layout: rows of related fields side by side. "more" holds optional or rarely changed fields.
 const layouts:Record<string,{rows:string[][],more:string[]}>={
  [CASES]:{rows:[['C'],['B','D','E'],['F','G','N'],['H','I'],['X'],['W']],more:['K','J','Y','V','Z','A']},
- [SESSIONS]:{rows:[['C','B'],['D'],['J','K','L','I'],['O'],['E','F','P'],['G','H']],more:['N','R','A']},
+ [SESSIONS]:{rows:[['C','B'],['D'],['J','K','L','I'],['O'],['KIMAI'],['E','F','P'],['G','H']],more:['N','R','A']},
  [PROOF]:{rows:[['B','C'],['F'],['E'],['D','H'],['I','J']],more:['K','N','A']},
  [CLAIMS]:{rows:[['B','C'],['E'],['H'],['K','J'],['D','G']],more:['L','M','Q','R','T','A']},
  [PORTFOLIO]:{rows:[['B','C'],['D'],['E','G'],['M'],['I']],more:['H','A']},
@@ -59,6 +59,8 @@ function SearchChoice({value,onChange,options,label,placeholder='Choose…'}:{va
 export default function Studio({displayName}:{displayName:string}){
  const [books,setBooks]=useState<any[]>([]),[book,setBook]=useState<Book|null>(null),[view,setView]=useState<'cases'|'case'|'skills'|'history'>('cases'),[openCase,setOpenCase]=useState(''),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState('');
  const [form,setForm]=useState<Form|null>(null),[values,setValues]=useState<Record<string,string>>({}),[pending,setPending]=useState<Upload[]>([]),[formError,setFormError]=useState(''),[saving,setSaving]=useState(false),[history,setHistory]=useState<any[]>([]),[portfolio,setPortfolio]=useState<Row|null>(null),[publicCheck,setPublicCheck]=useState(false),[dragging,setDragging]=useState(false);
+ type Kimai={connected:boolean,url:string,user:string|null};type KCatalog={projects:{id:number,name:string}[],activities:{id:number,name:string,project:number|null}[]};
+ const [kimai,setKimai]=useState<Kimai|null>(null),[kstatus,setKstatus]=useState<any>(null),[kcatalog,setKcatalog]=useState<KCatalog|null>(null),[kimaiView,setKimaiView]=useState<''|'connect'|'review'>(''),[ksyncing,setKsyncing]=useState(false),[kchoice,setKchoice]=useState(''),[kpick,setKpick]=useState<Record<number,string>>({});
  const [dark,setDark]=useState(()=>document.documentElement.classList.contains('dark'));
  function toggleTheme(){const next=!dark;setDark(next);document.documentElement.classList.toggle('dark',next);try{localStorage.setItem('theme',next?'dark':'light');}catch{}}
  const uploadRef=useRef<HTMLInputElement>(null),fileRef=useRef<HTMLInputElement>(null),lastForm=useRef<Form|null>(null);
@@ -80,6 +82,8 @@ export default function Studio({displayName}:{displayName:string}){
  async function refreshBooks(){const list=await api('books');setBooks(list);return list;}
  async function openBook(id:string){setBusy(true);setError('');try{setBook(await api('books/'+id));setView('cases');setOpenCase('');setSearch('');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  useEffect(()=>{refreshBooks().then(list=>list.length&&openBook(list[0].id)).catch(e=>setError(e.message)).finally(()=>setLoaded(true));},[]);
+ useEffect(()=>{api('kimai').then(setKimai).catch(()=>{});},[]);
+ useEffect(()=>{if(kimai?.connected&&book){kimaiSync(true);api('kimai/catalog').then(setKcatalog).catch(()=>{});}},[kimai?.connected,book?.id]);
  useEffect(()=>{if(view==='history'&&book)api(`books/${book.id}/history`).then(setHistory).catch(e=>setError(e.message));},[view,book?.id,book?.revision]);
  useEffect(()=>{const ctx=(document as any).modelContext;if(!ctx?.registerTool)return;const controller=new AbortController();Promise.resolve(ctx.registerTool({name:'read_casebook_records',title:'Read casebook records',description:'Read records in the selected personal casebook without changing them.',inputSchema:{type:'object',properties:{sheet:{type:'string',enum:Object.keys(labels)}},required:['sheet'],additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute:(input:any)=>{if(!book)throw Error('Upload or open a casebook first.');if(!input||!Object.keys(labels).includes(input.sheet))throw Error('Choose a supported sheet.');return {sheet:input.sheet,revision:book.revision,records:rowsFor(book.data,book.edits,input.sheet)};}},{signal:controller.signal})).catch(()=>{});return()=>controller.abort();},[book]);
  async function importBook(file:File){setBusy(true);setError('');try{const f=new FormData();f.set('file',file);const {id}=await api('books',{method:'POST',body:f});await refreshBooks();await openBook(id);toast.success('Casebook imported.');}catch(e){setError((e as Error).message);}finally{setBusy(false);if(uploadRef.current)uploadRef.current.value='';}}
@@ -117,11 +121,12 @@ export default function Studio({displayName}:{displayName:string}){
    if(sheet===PORTFOLIO)init=inferFromCase(sheet,fallbackCase,{...init,E:'Project Page',G:'No'});
   }
   setValues(init);setForm({sheet,row:rowNum,existing:!!row});
+  if(sheet===SESSIONS){const m=kmapFor(init.C);setKchoice(!row&&m?`${m.project}:${m.activity}`:'');}
  }
  function withParent(next:Record<string,string>,parentId:string){const p=findCase(parentId);next.B=p?.values.A??'';next.A=nextCaseId(cases.map(r=>r.values.A),p?.values.A??'',new Date().getFullYear());if(p)Object.assign(next,{D:next.D==='Training Case'?'Project Case':next.D,E:p.values.E||next.E,H:domainCode(p.values.H??'')||next.H,I:domainCode(p.values.I??'')||next.I,J:p.values.J||next.J});return next;}
  function change(col:string,v:string){setValues(old=>{
   if(!form)return old;const sheet=form.sheet;let next={...old,[col]:v};
-  if(!form.existing&&col===caseCol(sheet)&&sheet!==CASES)next=inferFromCase(sheet,v,next);
+  if(!form.existing&&col===caseCol(sheet)&&sheet!==CASES){next=inferFromCase(sheet,v,next);if(sheet===SESSIONS){const m=kmapFor(v);setKchoice(m?`${m.project}:${m.activity}`:'');}}
   if(sheet===CASES&&col==='B'&&!form.existing)next=withParent(next,v);
   if(sheet===SESSIONS&&(col==='J'||col==='K')){const h=hoursBetween(next.J,next.K);if(h)next.L=h;}
   if(sheet===SESSIONS&&col==='L'&&next.J)next.K=addHours(next.J,v);
@@ -135,7 +140,12 @@ export default function Studio({displayName}:{displayName:string}){
    else setPending(p=>[...p,{id:r.id,name:r.name,hash:r.hash,ref:r.ref}]);}}
   catch(e){setFormError((e as Error).message);}finally{setSaving(false);if(fileRef.current)fileRef.current.value='';}
  }
- async function put(rev:number,sheet:string,row:number,vals:Record<string,string>){return api(`books/${book!.id}/entries`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet,row,revision:rev,values:vals})});}
+ async function put(rev:number,sheet:string,row:number,vals:Record<string,string>,extra:Record<string,any>={}){return api(`books/${book!.id}/entries`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet,row,revision:rev,values:vals,...extra})});}
+ const send=(path:string,body:any,method='POST')=>api(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ async function kimaiSync(quiet=false){if(!book)return;setKsyncing(true);try{const st=await api(`books/${book.id}/kimai/sync`,{method:'POST'});setKstatus(st);if(st.pulled)setBook(await api('books/'+book.id));if(!quiet&&(st.pulled||st.pushed))toast.success(`Kimai: ${[st.pulled&&`${st.pulled} updated here`,st.pushed&&`${st.pushed} updated in Kimai`].filter(Boolean).join(', ')}.`);}catch(e){setKstatus((old:any)=>({...(old??{}),connected:true,offline:(e as Error).message}));if(!quiet)toast.error((e as Error).message);}finally{setKsyncing(false);}}
+ async function kimaiAct(path:string,body:any){if(!book)return;try{const r=await send(`books/${book.id}/kimai/${path}`,body);if(r.edits)setBook(b=>b&&{...b,revision:r.revision,edits:r.edits,updated:r.updated});await kimaiSync(true);return r;}catch(e){toast.error((e as Error).message);}}
+ const kmapFor=(caseId:string)=>kstatus?.map?.[caseId];
+ const kOptions:[string,string][]=(kcatalog?.activities??[]).map(a=>[`${a.project??''}:${a.id}`,`${kcatalog?.projects.find(p=>p.id===a.project)?.name??'Any project'} · ${a.name}`]);
  // Files dropped on a session or skill claim become proof records on the same case first.
  async function saveEntry(){if(!form||!book)return;setSaving(true);setFormError('');
   try{
@@ -147,8 +157,12 @@ export default function Studio({displayName}:{displayName:string}){
      rev=r.revision;edits=r.edits;updated=r.updated;made.push(id);row++;}
     const col=form.sheet===SESSIONS?'O':'H';vals[col]=[...(vals[col]?vals[col].split(/[,;\s]+/).filter(Boolean):[]),...made].join(', ');
    }
-   const r=await put(rev,form.sheet,form.row,vals);
+   let extra={};
+   if(form.sheet===SESSIONS&&kimai?.connected&&!kstatus?.linked?.includes(vals.A)&&kchoice){const [project,activity]=kchoice.split(':').map(Number);const m=kmapFor(caseId);if(!m||m.project!==project||m.activity!==activity)await send(`books/${book.id}/kimai/map`,{case_id:caseId,project,activity},'PUT');extra={kimai:true};}
+   const r=await put(rev,form.sheet,form.row,vals,extra);
    setBook({...book,revision:r.revision,edits:r.edits,updated:r.updated});setForm(null);setPending([]);await refreshBooks();
+   if(r.kimai?.status==='error')toast.error(`Saved here. Kimai: ${r.kimai.error}`);else if(r.kimai?.status==='conflict')toast.warning('Saved here. It also changed in Kimai, so check Kimai review.');
+   if(r.kimai)kimaiSync(true);
    if(form.sheet===CASES&&!form.existing)goCase(vals.A);
    toast.success(`${labels[form.sheet]} saved.`);
   }catch(e){setFormError((e as Error).message);try{setBook(await api('books/'+book.id));}catch{}}finally{setSaving(false);}
@@ -163,6 +177,7 @@ export default function Studio({displayName}:{displayName:string}){
   if(sheet===CLAIMS&&col==='H'){const chosen=value.split(/[,;\s]+/).filter(Boolean),mine=proof.filter(r=>r.values.B===values.B);const toggle=(id:string)=>set((chosen.includes(id)?chosen.filter(x=>x!==id):[...chosen,id]).join(', '));
    return <Field key={col} label="Proof" required wide group><div className="chips">{mine.map(r=><button type="button" key={r.values.A} className={'chip'+(chosen.includes(r.values.A)?' on':'')} onClick={()=>toggle(r.values.A)} title={r.values.E}>{chosen.includes(r.values.A)&&<Check size={13}/>}{r.values.A}<span>{r.values.E}</span></button>)}{pending.map(f=><span key={f.id} className="chip on"><Paperclip size={13}/>{f.name}</span>)}<AttachButton/></div></Field>;}
   if(sheet===SESSIONS&&col==='O')return <Field key={col} label={label} wide group><div className="chips">{value.split(/[,;\s]+/).filter(Boolean).map(id=><span key={id} className="chip on">{id}</span>)}{pending.map(f=><span key={f.id} className="chip on"><Paperclip size={13}/>{f.name}</span>)}<AttachButton/></div></Field>;
+  if(sheet===SESSIONS&&col==='KIMAI'){if(!kimai?.connected)return null;if(form.existing&&kstatus?.linked?.includes(values.A))return <Field key={col} label="Kimai" group><span className="chip on fit"><Link2 size={13}/>Linked</span></Field>;if(['T4','T5'].includes(values.I))return null;return <Field key={col} label="Kimai"><Choice label="Kimai" value={kchoice||'none'} onChange={v=>setKchoice(v==='none'?'':v)} options={[['none',"Don't add"],...kOptions]}/></Field>;}
   if(sheet===SESSIONS&&['J','K'].includes(col)){if(['T4','T5'].includes(values.I))return null;return <Field key={col} label={label}><Input type="time" value={clockTime(value)||value} onChange={e=>set(e.target.value)} aria-label={label}/></Field>;}
   if(sheet===SESSIONS&&col==='L'){if(['T4','T5'].includes(values.I))return null;return <Field key={col} label="Hours"><Input type="number" step="0.25" min={0} max={24} value={value} onChange={e=>set(e.target.value)} aria-label="Hours"/></Field>;}
   if(sheet===PROOF&&col==='F')return <Field key={col} label="File or link" required wide>{value.startsWith('attachments/')?<div className="file-chip"><FileText size={16}/><span>{value.replace(/^attachments\/[^/]+\//,'')}</span><button type="button" aria-label="Remove file" onClick={()=>setValues(v=>({...v,F:'',G:''}))}><X size={14}/></button></div>:<div className="drop"><Button type="button" variant="outline" onClick={()=>fileRef.current?.click()} disabled={saving}><Upload size={15}/>Choose file</Button>{book.files.length>0&&<Choice label="Saved file" value="" onChange={id=>{const f=book.files.find(f=>f.id===id)!;setValues(v=>({...v,F:`attachments/${f.id}/${f.name}`,G:'SHA256:'+f.hash,D:proofTypeFor(f.name)}));}} options={book.files.map(f=>[f.id,f.name])}/>}<Input placeholder="or paste a link" value={value} onChange={e=>set(e.target.value)} aria-label="Link"/></div>}</Field>;
@@ -197,6 +212,7 @@ export default function Studio({displayName}:{displayName:string}){
   <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" className="book-menu">{book?.data.profile.Name||book?.name.replace(/\.xlsx$/i,'')||'Casebook'}<ChevronDown size={15}/></Button></PopoverTrigger><PopoverContent align="end" className="menu w-64 p-1.5">
    {books.length>1&&<>{books.map(b=><button key={b.id} className="menu-item" onClick={()=>openBook(b.id)}>{book?.id===b.id?<Check size={15}/>:<span className="w-[15px]"/>}<span className="truncate">{b.name}</span></button>)}<hr/></>}
    <button className="menu-item" onClick={()=>uploadRef.current?.click()}><Upload size={15}/>Import casebook</button>
+   {book&&<button className="menu-item" onClick={()=>setKimaiView('connect')}><Clock size={15}/>Kimai</button>}
    {book&&<><hr/><button className="menu-item" onClick={()=>download('export')}><Download size={15}/>Download Excel</button><button className="menu-item" onClick={()=>download('bundle')}><Download size={15}/>Download Excel + proof</button><button className="menu-item" onClick={()=>download('original')}><Download size={15}/>Download original</button></>}
   </PopoverContent></Popover></div></header>
  <input ref={uploadRef} type="file" accept=".xlsx" className="hidden" onChange={e=>e.target.files?.[0]&&importBook(e.target.files[0])}/>
@@ -207,6 +223,7 @@ export default function Studio({displayName}:{displayName:string}){
  view==='cases'?<>
   <div className="heading"><h1>Cases</h1><div className="heading-actions"><div className="search"><Search size={15}/><Input placeholder="Search" aria-label="Search cases" value={search} onChange={e=>setSearch(e.target.value)}/></div><Button variant="outline" onClick={()=>start(CASES)}><Plus size={15}/>New case</Button></div></div>
   <div className="stats"><Stat label="Cases" value={cases.filter(r=>!isParent(r)).length}/><Stat label="Tracked hours" value={tracked.toFixed(1)}/><Stat label="Rebuilt hours" value={rebuilt.toFixed(1)}/><Stat label="Skill claims" value={claims.length}/></div>
+  {kimai?.connected&&<KimaiBar/>}
   {cases.length===0?<div className="empty"><p>No cases yet.</p><Button variant="outline" onClick={()=>start(CASES)}><Plus size={15}/>New case</Button></div>:
   [...parents.map(p=>({p,kids:cases.filter(r=>!isParent(r)&&parentOf(r)===p)})),{p:undefined,kids:loose}].filter(g=>g.kids.length||g.p).map(g=>{const kids=g.kids.filter(match);if(q&&!kids.length&&!(g.p&&match(g.p)))return null;return <section className="group" key={g.p?.values.A??'loose'}>
    {g.p?<div className="group-head"><span className="mono">{g.p.values.A}</span><h2>{g.p.values.C}</h2><button className="icon-btn" aria-label="Edit project" onClick={()=>start(CASES,g.p)}><Pencil size={14}/></button><button className="text-btn" onClick={()=>start(CASES,undefined,g.p!.values.A)}><Plus size={14}/>Add case to project</button></div>:parents.length>0&&g.kids.length>0&&<div className="group-head"><h2>Other cases</h2></div>}
@@ -234,8 +251,41 @@ export default function Studio({displayName}:{displayName:string}){
  </DialogContent></Dialog>
 
  <Dialog open={!!portfolio} onOpenChange={open=>!open&&setPortfolio(null)}><DialogContent className="portfolio-dialog"><DialogHeader><DialogTitle>{portfolio?.values.D}</DialogTitle><DialogDescription>{portfolio?.values.J??'Pending Review'}</DialogDescription></DialogHeader><p className="portfolio-story">{portfolio?.values.M||'No story yet.'}</p>{portfolio?.values.I&&<p className="muted">{portfolio.values.I}</p>}<label className="confirm-label"><Checkbox checked={publicCheck} onCheckedChange={v=>setPublicCheck(v===true)}/><span>Reviewed and OK to share</span></label><Button className="primary-button" disabled={!publicCheck||portfolio?.values.G!=='Yes'||!portfolio?.values.M} title={portfolio?.values.G!=='Yes'?'Set Cleaned Up to Yes first':undefined} onClick={()=>{if(!portfolio)return;const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));const title=escape(portfolio.values.D),story=escape(portfolio.values.M),skills=escape(portfolio.values.I??''),state=escape(portfolio.values.J==='Approved'?'Approved project record':'Learning record · Review pending');const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{font:18px/1.7 system-ui;color:#1b2a33;background:#f6f7f8;margin:0;padding:7vw}main{max-width:850px;margin:auto;background:white;padding:5vw;border-radius:10px}h1{font-size:2.5em;line-height:1.15}p{white-space:pre-wrap}.meta{font-size:14px;color:#5b6b75}</style><main><p class="meta">I/O Shield · Project portfolio</p><h1>${title}</h1><p class="meta">${state}</p><p>${story}</p><h2>Skills described</h2><p>${skills}</p></main></html>`;downloadBlob(new Blob([html],{type:'text/html'}),'portfolio-project.html');}}><Download size={15}/>Download page</Button></DialogContent></Dialog>
+ <KimaiConnect/>
+ <KimaiReview/>
  </SidebarProvider>;
 
+ function KimaiBar(){
+  const st=kstatus,parts=st&&!st.offline?[st.new?.length&&`${st.new.length} new`,st.to_send?.length&&`${st.to_send.length} to send`,st.conflicts?.length&&`${st.conflicts.length} changed on both sides`,st.missing?.length&&`${st.missing.length} removed`].filter(Boolean):[];
+  const ago=st?.synced?Math.max(0,Math.round((Date.now()-Date.parse(st.synced))/60000)):null;
+  return <div className="kimai-bar"><Clock size={15}/><span>{st?.offline?<>Kimai offline</>:parts.length?<>Kimai · {parts.join(' · ')}</>:<>Kimai up to date</>}</span>{ago!==null&&<span className="muted">{ago<1?'just now':`${ago} min ago`}</span>}<button className="icon-btn" aria-label="Sync with Kimai" title="Sync" onClick={()=>kimaiSync()} disabled={ksyncing}><RefreshCw size={14} className={ksyncing?'spin':''}/></button>{parts.length>0&&<button className="text-btn" onClick={()=>setKimaiView('review')}>Review</button>}</div>;
+ }
+ function KimaiConnect(){
+  const [url,setUrl]=useState(kimai?.url??'https://clock.ioshield.io'),[token,setToken]=useState(''),[busyK,setBusyK]=useState(false),[err,setErr]=useState('');
+  useEffect(()=>{if(kimaiView==='connect'){setUrl(kimai?.url??'https://clock.ioshield.io');setToken('');setErr('');}},[kimaiView]);
+  async function connect(){setBusyK(true);setErr('');try{const k=await send('kimai',{url,token},'PUT');setKimai(k);toast.success(`Connected to Kimai as ${k.user}.`);}catch(e){setErr((e as Error).message);}finally{setBusyK(false);}}
+  async function disconnect(){const k=await send('kimai/disconnect',{});setKimai({...kimai!,...k,user:null});setKstatus(null);}
+  const mapped=cases.filter(r=>!isParent(r));
+  return <Dialog open={kimaiView==='connect'} onOpenChange={o=>!o&&setKimaiView('')}><DialogContent className="entry-dialog"><DialogHeader><DialogTitle>Kimai</DialogTitle><DialogDescription>{kimai?.connected?`Connected as ${kimai.user}`:'Not connected'}</DialogDescription></DialogHeader><div className="entry-scroll">
+   {err&&<div className="form-error" role="alert">{err}</div>}
+   <div className="form-rows"><div className="form-row" style={{gridTemplateColumns:'1fr 1fr'}}><Field label="Kimai address"><Input value={url} onChange={e=>setUrl(e.target.value)}/></Field><Field label="API token"><Input type="password" autoComplete="off" placeholder={kimai?.connected?'Saved':''} value={token} onChange={e=>setToken(e.target.value)}/></Field></div></div>
+   <details className="more tutorial"><summary>How to get an API token</summary><img src="/tutorials/kimai-api-token.gif" alt="In Kimai, open your profile menu, choose API access, then Create, and copy the token." loading="lazy" onError={e=>(e.currentTarget.parentElement!.style.display='none')}/></details>
+   {kimai?.connected&&kcatalog&&mapped.length>0&&<details className="more" open><summary>Cases and Kimai activities</summary><div className="list">{mapped.map(c=>{const m=kmapFor(c.values.A);return <div key={c.row} className="map-row"><span className="mono">{c.values.A}</span><span className="case-name">{c.values.C}</span><Choice label={`Kimai activity for ${c.values.A}`} value={m?`${m.project}:${m.activity}`:'none'} onChange={async v=>{if(v==='none')return;const [project,activity]=v.split(':').map(Number);await kimaiAct('map',{case_id:c.values.A,project,activity});}} options={[['none','Not linked'],...kOptions]}/></div>;})}</div></details>}
+  </div><div className="dialog-actions">{kimai?.connected&&<Button variant="ghost" onClick={disconnect}>Disconnect</Button>}<Button className="primary-button" onClick={connect} disabled={busyK}>{busyK?'Checking…':kimai?.connected?'Save':'Connect'}</Button></div></DialogContent></Dialog>;
+ }
+ function KimaiReview(){
+  const st=kstatus??{},caseName=(id:string)=>findCase(id)?.values.C??id;
+  const fmt=(e:any)=>`${e.date} · ${e.start}–${e.end}`;
+  const pick=(e:any)=>kpick[e.id]??e.suggested_case??'';
+  const caseOpts:[string,string][]=(st.cases??[]).map((c:any)=>[c.id,`${c.id} · ${c.name}`]);
+  return <Dialog open={kimaiView==='review'} onOpenChange={o=>!o&&setKimaiView('')}><DialogContent className="entry-dialog"><DialogHeader><DialogTitle>Kimai review</DialogTitle><DialogDescription>{kimai?.user}</DialogDescription></DialogHeader><div className="entry-scroll">
+   {st.new?.length>0&&<section className="group"><div className="group-head"><h2>New in Kimai</h2><span className="muted">{st.new.length}</span><button className="text-btn" disabled={st.new.some((e:any)=>!e.match_session&&!pick(e))} onClick={()=>kimaiAct('import',{items:st.new.map((e:any)=>({kimai_id:e.id,case_id:pick(e),link_session:e.match_session??undefined}))})}>Import all</button></div><div className="list">{st.new.map((e:any)=><div key={e.id} className="review-row"><div><strong>{e.description||e.activityName}</strong><span className="muted">{fmt(e)} · {e.hours} h{e.description?` · ${e.activityName}`:''}</span></div>{e.match_session?<span className="muted">Same as {e.match_session}</span>:<Choice label="Case" value={pick(e)} onChange={v=>setKpick(p=>({...p,[e.id]:v}))} options={caseOpts}/>}<Button size="sm" variant="outline" disabled={!e.match_session&&!pick(e)} onClick={()=>kimaiAct('import',{items:[{kimai_id:e.id,case_id:pick(e),link_session:e.match_session??undefined}]})}>{e.match_session?'Link':'Import'}</Button></div>)}</div></section>}
+   {st.to_send?.length>0&&<section className="group"><div className="group-head"><h2>Not in Kimai yet</h2><span className="muted">{st.to_send.length}</span><button className="text-btn" onClick={async()=>{for(const x of st.to_send)await kimaiAct('send',{session_id:x.session_id});}}>Send all</button></div><div className="list">{st.to_send.map((x:any)=><div key={x.session_id} className="review-row"><div><strong>{x.description}</strong><span className="muted">{fmt(x)} · {caseName(x.case_id)}</span></div><span/><Button size="sm" variant="outline" onClick={()=>kimaiAct('send',{session_id:x.session_id})}>Send</Button></div>)}</div></section>}
+   {st.conflicts?.length>0&&<section className="group"><div className="group-head"><h2>Changed on both sides</h2></div><div className="list">{st.conflicts.map((c:any)=><div key={c.session_id} className="review-row"><div><strong>{c.session_id}</strong><span className="muted">Here: {fmt(c.app)} · {c.app.description}</span><span className="muted">Kimai: {fmt(c.kimai)} · {c.kimai.description}</span></div><Button size="sm" variant="outline" onClick={()=>kimaiAct('resolve',{session_id:c.session_id,keep:'app'})}>Keep this</Button><Button size="sm" variant="outline" onClick={()=>kimaiAct('resolve',{session_id:c.session_id,keep:'kimai'})}>Keep Kimai</Button></div>)}</div></section>}
+   {st.missing?.length>0&&<section className="group"><div className="group-head"><h2>Removed</h2></div><div className="list">{st.missing.map((m:any)=><div key={m.session_id} className="review-row"><div><strong>{m.session_id}</strong><span className="muted">{m.reason==='kimai'?'Deleted in Kimai':'Not in this casebook'}</span></div><span/><Button size="sm" variant="outline" onClick={()=>kimaiAct('resolve',{session_id:m.session_id,keep:'unlink'})}>Unlink</Button></div>)}</div></section>}
+   {!st.new?.length&&!st.to_send?.length&&!st.conflicts?.length&&!st.missing?.length&&<div className="empty"><p>Everything matches Kimai.</p></div>}
+  </div></DialogContent></Dialog>;
+ }
  function CaseView(){
   const c=current!,id=c.values.A,mySessions=sessions.filter(r=>r.values.C===id),myProof=proof.filter(r=>r.values.B===id),myClaims=claims.filter(r=>r.values.B===id),myStories=stories.filter(r=>r.values.B===id),parent=parentOf(c);
   return <>
