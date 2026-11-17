@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Upload,Plus,Download,FolderOpen,Clock,FileCheck,Layers,Briefcase,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil,Sun,Moon,RefreshCw,Link2} from 'lucide-react';
+import {Upload,Plus,Download,FolderOpen,Clock,FileCheck,Layers,Briefcase,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil,Sun,Moon,RefreshCw,Link2,Play} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
@@ -61,6 +61,7 @@ export default function Studio({displayName}:{displayName:string}){
  const [form,setForm]=useState<Form|null>(null),[values,setValues]=useState<Record<string,string>>({}),[pending,setPending]=useState<Upload[]>([]),[formError,setFormError]=useState(''),[saving,setSaving]=useState(false),[history,setHistory]=useState<any[]>([]),[portfolio,setPortfolio]=useState<Row|null>(null),[publicCheck,setPublicCheck]=useState(false),[dragging,setDragging]=useState(false);
  type Kimai={connected:boolean,url:string,user:string|null};type KCatalog={projects:{id:number,name:string}[],activities:{id:number,name:string,project:number|null}[]};
  const [kimai,setKimai]=useState<Kimai|null>(null),[kstatus,setKstatus]=useState<any>(null),[kcatalog,setKcatalog]=useState<KCatalog|null>(null),[kimaiView,setKimaiView]=useState<''|'connect'|'review'>(''),[ksyncing,setKsyncing]=useState(false),[kchoice,setKchoice]=useState(''),[kpick,setKpick]=useState<Record<number,string>>({});
+ const [menuOpen,setMenuOpen]=useState(false),[helpOpen,setHelpOpen]=useState(false),[helpClip,setHelpClip]=useState(0);
  const [dark,setDark]=useState(()=>document.documentElement.classList.contains('dark'));
  function toggleTheme(){const next=!dark;setDark(next);document.documentElement.classList.toggle('dark',next);try{localStorage.setItem('theme',next?'dark':'light');}catch{}}
  const uploadRef=useRef<HTMLInputElement>(null),fileRef=useRef<HTMLInputElement>(null),lastForm=useRef<Form|null>(null);
@@ -209,10 +210,11 @@ export default function Studio({displayName}:{displayName:string}){
  <Sidebar className="studio-sidebar" collapsible="icon"><SidebarHeader><div className="brand"><Shield size={18}/><strong>Casebook Studio</strong></div></SidebarHeader><SidebarContent><SidebarMenu>{nav.map(s=><SidebarMenuItem key={s.id}><SidebarMenuButton tooltip={s.label} isActive={view===s.id||s.id==='cases'&&view==='case'} onClick={()=>{setView(s.id);setSearch('');}} disabled={!book}><s.icon/><span>{s.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu><button className="theme-btn" onClick={toggleTheme} aria-label={dark?'Light mode':'Dark mode'} title={dark?'Light mode':'Dark mode'}>{dark?<Sun size={16}/>:<Moon size={16}/>}</button></SidebarContent></Sidebar>
  <SidebarInset><header className="topbar"><div className="topbar-left"><SidebarTrigger/>{view==='case'&&current&&<button className="crumb" onClick={()=>setView('cases')}><ChevronLeft size={16}/>Cases</button>}</div>
   <div className="topbar-actions">{book&&<Button className="primary-button" size="sm" onClick={()=>start(SESSIONS)} disabled={busy||!cases.some(r=>!isParent(r))}><Clock size={15}/>Log session</Button>}
-  <Popover><PopoverTrigger asChild><Button variant="ghost" size="sm" className="book-menu">{book?.data.profile.Name||book?.name.replace(/\.xlsx$/i,'')||'Casebook'}<ChevronDown size={15}/></Button></PopoverTrigger><PopoverContent align="end" className="menu w-64 p-1.5">
+  <Popover open={menuOpen} onOpenChange={setMenuOpen}><PopoverTrigger asChild><Button variant="ghost" size="sm" className="book-menu">{book?.data.profile.Name||book?.name.replace(/\.xlsx$/i,'')||'Casebook'}<ChevronDown size={15}/></Button></PopoverTrigger><PopoverContent align="end" className="menu w-64 p-1.5" onClick={e=>{if((e.target as HTMLElement).closest('.menu-item'))setMenuOpen(false);}}>
    {books.length>1&&<>{books.map(b=><button key={b.id} className="menu-item" onClick={()=>openBook(b.id)}>{book?.id===b.id?<Check size={15}/>:<span className="w-[15px]"/>}<span className="truncate">{b.name}</span></button>)}<hr/></>}
    <button className="menu-item" onClick={()=>uploadRef.current?.click()}><Upload size={15}/>Import casebook</button>
    {book&&<button className="menu-item" onClick={()=>setKimaiView('connect')}><Clock size={15}/>Kimai</button>}
+   <button className="menu-item" onClick={()=>setHelpOpen(true)}><Play size={15}/>Help</button>
    {book&&<><hr/><button className="menu-item" onClick={()=>download('export')}><Download size={15}/>Download Excel</button><button className="menu-item" onClick={()=>download('bundle')}><Download size={15}/>Download Excel + proof</button><button className="menu-item" onClick={()=>download('original')}><Download size={15}/>Download original</button></>}
   </PopoverContent></Popover></div></header>
  <input ref={uploadRef} type="file" accept=".xlsx" className="hidden" onChange={e=>e.target.files?.[0]&&importBook(e.target.files[0])}/>
@@ -252,6 +254,7 @@ export default function Studio({displayName}:{displayName:string}){
 
  <Dialog open={!!portfolio} onOpenChange={open=>!open&&setPortfolio(null)}><DialogContent className="portfolio-dialog"><DialogHeader><DialogTitle>{portfolio?.values.D}</DialogTitle><DialogDescription>{portfolio?.values.J??'Pending Review'}</DialogDescription></DialogHeader><p className="portfolio-story">{portfolio?.values.M||'No story yet.'}</p>{portfolio?.values.I&&<p className="muted">{portfolio.values.I}</p>}<label className="confirm-label"><Checkbox checked={publicCheck} onCheckedChange={v=>setPublicCheck(v===true)}/><span>Reviewed and OK to share</span></label><Button className="primary-button" disabled={!publicCheck||portfolio?.values.G!=='Yes'||!portfolio?.values.M} title={portfolio?.values.G!=='Yes'?'Set Cleaned Up to Yes first':undefined} onClick={()=>{if(!portfolio)return;const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));const title=escape(portfolio.values.D),story=escape(portfolio.values.M),skills=escape(portfolio.values.I??''),state=escape(portfolio.values.J==='Approved'?'Approved project record':'Learning record · Review pending');const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{font:18px/1.7 system-ui;color:#1b2a33;background:#f6f7f8;margin:0;padding:7vw}main{max-width:850px;margin:auto;background:white;padding:5vw;border-radius:10px}h1{font-size:2.5em;line-height:1.15}p{white-space:pre-wrap}.meta{font-size:14px;color:#5b6b75}</style><main><p class="meta">I/O Shield · Project portfolio</p><h1>${title}</h1><p class="meta">${state}</p><p>${story}</p><h2>Skills described</h2><p>${skills}</p></main></html>`;downloadBlob(new Blob([html],{type:'text/html'}),'portfolio-project.html');}}><Download size={15}/>Download page</Button></DialogContent></Dialog>
  <KimaiConnect/>
+ <Dialog open={helpOpen} onOpenChange={setHelpOpen}><DialogContent className="entry-dialog"><DialogHeader><DialogTitle>Help</DialogTitle><DialogDescription className="sr-only">Short clips showing how to use Casebook Studio</DialogDescription></DialogHeader><div className="help-tabs">{tutorials.map((t,i)=><button key={t.src} className={'chip'+(i===helpClip?' on':'')} onClick={()=>setHelpClip(i)}>{t.title}</button>)}</div><Clip key={tutorials[helpClip].src} src={tutorials[helpClip].src} label={tutorials[helpClip].title}/></DialogContent></Dialog>
  <KimaiReview/>
  </SidebarProvider>;
 
@@ -269,7 +272,7 @@ export default function Studio({displayName}:{displayName:string}){
   return <Dialog open={kimaiView==='connect'} onOpenChange={o=>!o&&setKimaiView('')}><DialogContent className="entry-dialog"><DialogHeader><DialogTitle>Kimai</DialogTitle><DialogDescription>{kimai?.connected?`Connected as ${kimai.user}`:'Not connected'}</DialogDescription></DialogHeader><div className="entry-scroll">
    {err&&<div className="form-error" role="alert">{err}</div>}
    <div className="form-rows"><div className="form-row" style={{gridTemplateColumns:'1fr 1fr'}}><Field label="Kimai address"><Input value={url} onChange={e=>setUrl(e.target.value)}/></Field><Field label="API token"><Input type="password" autoComplete="off" placeholder={kimai?.connected?'Saved':''} value={token} onChange={e=>setToken(e.target.value)}/></Field></div></div>
-   <details className="more tutorial"><summary>How to get an API token</summary><img src="/tutorials/kimai-api-token.gif" alt="In Kimai, open your profile menu, choose API access, then Create, and copy the token." loading="lazy" onError={e=>(e.currentTarget.parentElement!.style.display='none')}/></details>
+   <details className="more tutorial"><summary>How to get an API token</summary><Clip src="/tutorials/kimai-api-token.mp4" label="In Kimai, open your profile menu, choose API access, then Create, and copy the token."/></details>
    {kimai?.connected&&kcatalog&&mapped.length>0&&<details className="more" open><summary>Cases and Kimai activities</summary><div className="list">{mapped.map(c=>{const m=kmapFor(c.values.A);return <div key={c.row} className="map-row"><span className="mono">{c.values.A}</span><span className="case-name">{c.values.C}</span><Choice label={`Kimai activity for ${c.values.A}`} value={m?`${m.project}:${m.activity}`:'none'} onChange={async v=>{if(v==='none')return;const [project,activity]=v.split(':').map(Number);await kimaiAct('map',{case_id:c.values.A,project,activity});}} options={[['none','Not linked'],...kOptions]}/></div>;})}</div></details>}
   </div><div className="dialog-actions">{kimai?.connected&&<Button variant="ghost" onClick={disconnect}>Disconnect</Button>}<Button className="primary-button" onClick={connect} disabled={busyK}>{busyK?'Checking…':kimai?.connected?'Save':'Connect'}</Button></div></DialogContent></Dialog>;
  }
@@ -305,6 +308,14 @@ export default function Studio({displayName}:{displayName:string}){
    </Section>
   </>;
  }
+}
+// Built-in tutorial clips, recorded by the scripts in source/tutorials/. Silent looping MP4s, shown like GIFs.
+const tutorials=[{title:'Log a session',src:'/tutorials/log-session.mp4'},{title:'Connect Kimai',src:'/tutorials/connect-kimai.mp4'},{title:'Import from Kimai',src:'/tutorials/import-kimai.mp4'}];
+function Clip({src,label}:{src:string,label:string}){
+ const ref=useRef<HTMLVideoElement>(null),[missing,setMissing]=useState(false),still=typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+ useEffect(()=>{if(!still)ref.current?.play().catch(()=>{});},[src]);
+ if(missing)return null;
+ return <video ref={ref} className="clip" src={src} aria-label={label} muted playsInline loop autoPlay={!still} controls={still} preload="metadata" onError={()=>setMissing(true)}/>;
 }
 function SuggestInput({value,onChange,options,label}:{value:string,onChange:(v:string)=>void,options:string[],label:string}){const [open,setOpen]=useState(false);const list=options.filter(o=>o!==value&&o.toLowerCase().includes(value.toLowerCase())).slice(0,8);return <div className="suggest"><Input aria-label={label} value={value} onChange={e=>{onChange(e.target.value);setOpen(true);}} onFocus={()=>setOpen(true)} onBlur={()=>setTimeout(()=>setOpen(false),120)}/>{open&&list.length>0&&<div className="suggest-list" role="listbox">{list.map(o=><button type="button" role="option" key={o} onMouseDown={e=>{e.preventDefault();onChange(o);setOpen(false);}}>{o}</button>)}</div>}</div>;}
 function Section({title,count,extra,add,addLabel,children}:{title:string,count:number,extra?:string,add:()=>void,addLabel:string,children:React.ReactNode}){return <section className="group"><div className="group-head"><h2>{title}</h2><span className="muted">{count||''}{extra&&count?` · ${extra}`:''}</span><button className="text-btn" onClick={add}><Plus size={14}/>{addLabel}</button></div>{count>0&&<div className="list">{children}</div>}</section>;}

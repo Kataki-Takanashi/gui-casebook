@@ -8317,7 +8317,7 @@ if (major < 22 || major === 22 && minor < 13) throw Error("Install Node.js 22.13
 var port = Number(process.env.CASEBOOK_PORT || 8765);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error("CASEBOOK_PORT must be between 1024 and 65535.");
 var origin = `http://127.0.0.1:${port}`;
-var types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json" };
+var types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json", ".mp4": "video/mp4" };
 var security = { "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'" };
 var queue = Promise.resolve();
 async function respond(req, res) {
@@ -8343,11 +8343,11 @@ async function respond(req, res) {
         res.writeHead(405, security);
         return res.end("Method not allowed.");
       }
-      let size = 0;
+      let size2 = 0;
       const chunks = [];
       for await (const chunk of req) {
-        size += chunk.length;
-        if (size > 40 * 1024 * 1024) {
+        size2 += chunk.length;
+        if (size2 > 40 * 1024 * 1024) {
           res.writeHead(413, security);
           return res.end("Upload exceeds 40 MB request limit.");
         }
@@ -8367,7 +8367,19 @@ async function respond(req, res) {
       res.writeHead(404, security);
       return res.end("Not found.");
     }
-    res.writeHead(200, { "Content-Type": types[path2.extname(filename)] || "application/octet-stream", "Cache-Control": url.pathname.startsWith("/assets/") ? "public,max-age=31536000,immutable" : "no-store", ...security });
+    const headers = { "Content-Type": types[path2.extname(filename)] || "application/octet-stream", "Cache-Control": url.pathname.startsWith("/assets/") ? "public,max-age=31536000,immutable" : "no-store", "Accept-Ranges": "bytes", ...security };
+    const size = fs2.statSync(filename).size, range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+    if (range && (range[1] || range[2])) {
+      const start = range[1] ? +range[1] : Math.max(0, size - +range[2]), end = range[1] && range[2] ? Math.min(+range[2], size - 1) : size - 1;
+      if (start > end || start >= size) {
+        res.writeHead(416, { "Content-Range": `bytes */${size}`, ...security });
+        return res.end();
+      }
+      res.writeHead(206, { ...headers, "Content-Range": `bytes ${start}-${end}/${size}`, "Content-Length": end - start + 1 });
+      if (req.method === "HEAD") return res.end();
+      return fs2.createReadStream(filename, { start, end }).pipe(res);
+    }
+    res.writeHead(200, { ...headers, "Content-Length": size });
     if (req.method === "HEAD") return res.end();
     fs2.createReadStream(filename).pipe(res);
   } catch (e) {

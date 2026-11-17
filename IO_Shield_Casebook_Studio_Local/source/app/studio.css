@@ -174,5 +174,6 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .map-row{display:grid;grid-template-columns:118px minmax(0,1fr) minmax(0,260px);gap:12px;align-items:center;padding:8px 14px;border-top:1px solid var(--border)}
 .list>.map-row:first-child{border-top:0}
 .chip.fit{width:max-content}
-.tutorial img{max-width:100%;border:1px solid var(--border);border-radius:8px;margin-top:8px}
+.clip{display:block;width:100%;aspect-ratio:16/10;background:var(--muted);border:1px solid var(--border);border-radius:8px;margin-top:8px}
+.help-tabs{display:flex;flex-wrap:wrap;gap:6px}
 @media(max-width:760px){.review-row,.map-row{grid-template-columns:1fr}}
