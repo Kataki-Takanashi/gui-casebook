@@ -8076,7 +8076,7 @@ async function kimaiStatus(b, owner, apply) {
     }
     return best;
   };
-  const suggest = (e) => Object.entries(map).find(([, m]) => m.project === e.project && m.activity === e.activity)?.[0] ?? Object.entries(map).find(([, m]) => m.project === e.project)?.[0] ?? byName(e);
+  const suggest = (e) => Object.entries(map).find(([, m]) => m.project === e.project && m.activity === e.activity)?.[0] || byName(e) || Object.entries(map).find(([, m]) => m.project === e.project)?.[0] || "";
   const fresh = remote.filter((e) => !linkedIds.has(e.id)).map((e) => {
     const match = rows.find((r) => !linkedSessions.has(r.values.A) && excelDate(r.values.B) === e.date && clockTime(r.values.J) === e.start);
     return { ...e, suggested_case: match?.values.C ?? suggest(e), match_session: match?.values.A ?? null };

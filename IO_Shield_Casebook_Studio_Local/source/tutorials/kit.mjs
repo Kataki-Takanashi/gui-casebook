@@ -9,27 +9,29 @@ import {chromium} from 'playwright-core';
 
 export const VIEWPORT={width:1280,height:800};
 export const OUT_DIR=path.resolve('web/public/tutorials');
-const MAX_SECONDS=12;
+const MAX_SECONDS=20;
+// Pacing: slow enough to follow as a tutorial.
+const GLIDE=0.9,SETTLE=950,AFTER_CLICK=900,TYPE_DELAY=95,AFTER_TYPE=700;
 
 // Opens Chrome with video recording. profileDir keeps a login between runs (used for Kimai).
 export async function start({profileDir,headless=true}={}){
  const videoDir=fs.mkdtempSync(path.join(os.tmpdir(),'casebook-clip-'));
- const opts={channel:'chrome',headless,viewport:VIEWPORT,deviceScaleFactor:1,recordVideo:{dir:videoDir,size:VIEWPORT}};
+ const opts={channel:'chrome',headless,viewport:VIEWPORT,deviceScaleFactor:1,bypassCSP:true,recordVideo:{dir:videoDir,size:VIEWPORT}};
  const context=profileDir?await chromium.launchPersistentContext(profileDir,opts):await (await chromium.launch({channel:'chrome',headless})).newContext(opts);
  const page=context.pages()[0]??await context.newPage();
  return {context,page,videoDir};
 }
 
 // A visible cursor and caption, since recordings don't show the real mouse.
-const OVERLAY=`(()=>{if(document.getElementById('__rec_cursor__'))return;
+const OVERLAY=`(()=>{const GLIDE=${GLIDE};if(document.getElementById('__rec_cursor__'))return;
  const c=document.createElement('div');c.id='__rec_cursor__';
  c.innerHTML='<svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 2l15 9-7 1.5L7.5 19z" fill="#111" stroke="#fff" stroke-width="1.5"/></svg>';
- Object.assign(c.style,{position:'fixed',left:'640px',top:'420px',zIndex:2147483647,pointerEvents:'none',transition:'left .5s ease,top .5s ease,transform .12s'});
+ Object.assign(c.style,{position:'fixed',left:'640px',top:'420px',zIndex:2147483647,pointerEvents:'none',transition:'left '+GLIDE+'s ease-in-out,top '+GLIDE+'s ease-in-out,transform .15s'});
  const p=document.createElement('div');p.id='__rec_caption__';
  Object.assign(p.style,{position:'fixed',left:'50%',bottom:'28px',transform:'translateX(-50%)',zIndex:2147483647,pointerEvents:'none',background:'rgba(17,24,28,.88)',color:'#fff',font:'500 16px system-ui,-apple-system,sans-serif',padding:'9px 16px',borderRadius:'999px',opacity:'0',transition:'opacity .25s'});
  document.documentElement.append(c,p);})()`;
 export async function overlay(page){await page.addInitScript(OVERLAY);await page.evaluate(OVERLAY).catch(()=>{});}
-export const hold=(page,ms=700)=>page.waitForTimeout(ms);
+export const hold=(page,ms=1000)=>page.waitForTimeout(ms);
 export async function caption(page,text){
  if(/[–—]/.test(text))throw Error(`No dashes in captions: ${text}`);
  await page.evaluate(t=>{const p=document.getElementById('__rec_caption__');if(!p)return;p.textContent=t;p.style.opacity=t?'1':'0';},text);
@@ -37,23 +39,35 @@ export async function caption(page,text){
 export async function moveTo(page,locator){
  await locator.waitFor({state:'visible'});const b=await locator.boundingBox();
  await page.evaluate(([x,y])=>{const c=document.getElementById('__rec_cursor__');if(c){c.style.left=x+'px';c.style.top=y+'px';}},[b.x+b.width/2,b.y+b.height/2]);
- await page.waitForTimeout(550);
+ await page.waitForTimeout(SETTLE);
 }
 export async function click(page,locator){
  await moveTo(page,locator);
  await page.evaluate(()=>{const c=document.getElementById('__rec_cursor__');if(c){c.style.transform='scale(.8)';setTimeout(()=>c.style.transform='',150);}});
- await locator.click();await hold(page,500);
+ await locator.click();await hold(page,AFTER_CLICK);
 }
-export async function type(page,locator,text){await click(page,locator);await locator.pressSequentially(text,{delay:45});await hold(page,400);}
+export async function type(page,locator,text){await click(page,locator);await locator.pressSequentially(text,{delay:TYPE_DELAY});await hold(page,AFTER_TYPE);}
 // Blur anything that must never appear in a clip (tokens, emails). Applied before it renders.
 export async function blur(page,selectors){await page.addStyleTag({content:`${selectors.join(',')}{filter:blur(7px)!important}`});}
 
+// Like blur(), but applied from the first paint of every page the tab loads (for multi-page flows like Kimai).
+export async function blurOnLoad(page,rules){
+ const css=rules.join('\n');
+ await page.addInitScript(c=>{const s=document.createElement('style');s.textContent=c;document.documentElement.append(s);},css);
+}
+
+// trim: seconds to cut from the start (page load before the first step).
+// blurRegions: [{x,y,width,height,from?,to?}] in page pixels, blurred in the video itself as a backup to CSS blur.
 // Stops recording, encodes MP4 (optionally cropped to a region for a zoomed-in look), checks length.
-export async function finish({context,page,videoDir},name,{crop}={}){
+export async function finish({context,page,videoDir},name,{crop,trim=0,blurRegions=[]}={}){
  const video=page.video();await context.close();const webm=await video.path();
  fs.mkdirSync(OUT_DIR,{recursive:true});const out=path.join(OUT_DIR,name+'.mp4');
- const filters=[crop&&`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}`,crop&&`scale=${VIEWPORT.width}:-2:flags=lanczos`,'fps=12','format=yuv420p'].filter(Boolean).join(',');
- execFileSync('ffmpeg',['-y','-loglevel','error','-i',webm,'-vf',filters,'-c:v','libx264','-preset','slow','-crf','28','-movflags','+faststart','-an',out]);
+ const tail=[crop&&`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y}`,crop&&`scale=${VIEWPORT.width}:-2:flags=lanczos`,'fps=12','format=yuv420p'].filter(Boolean).join(',');
+ let graph='',prev='[0:v]';
+ blurRegions.forEach((r,i)=>{const on=r.from!=null||r.to!=null?`:enable='between(t,${r.from??0},${r.to??9999})'`:'';
+  graph+=`${prev}split[m${i}][c${i}];[c${i}]crop=${r.width}:${r.height}:${r.x}:${r.y},boxblur=luma_radius=16:luma_power=4:chroma_radius=8:chroma_power=4[b${i}];[m${i}][b${i}]overlay=${r.x}:${r.y}${on}[v${i}];`;prev=`[v${i}]`;});
+ graph+=`${prev}${tail}[out]`;
+ execFileSync('ffmpeg',['-y','-loglevel','error',...(trim>0?['-ss',trim.toFixed(2)]:[]),'-i',webm,'-filter_complex',graph,'-map','[out]','-c:v','libx264','-preset','slow','-crf','28','-movflags','+faststart','-an',out]);
  fs.rmSync(videoDir,{recursive:true,force:true});
  const seconds=+execFileSync('ffprobe',['-v','error','-show_entries','format=duration','-of','csv=p=0',out]).toString();
  const kb=Math.round(fs.statSync(out).size/1024);

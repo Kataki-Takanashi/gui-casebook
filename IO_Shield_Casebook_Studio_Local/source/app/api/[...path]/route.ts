@@ -78,7 +78,8 @@ async function kimaiStatus(b:any,owner:string,apply:boolean){
  // Before anything is mapped, guess the case from words shared by the Kimai project and the case name.
  const words=(t:string)=>new Set((t.toLowerCase().match(/[a-z0-9]{3,}/g)??[]).filter(w=>!['the','and','project','case'].includes(w)));
  const byName=(e:K.KimaiEntry)=>{const k=words(e.projectName+' '+e.activityName);let best='',score=0;for(const c of cases){if(c.values.D==='Parent Project')continue;const n=[...words(c.values.C??'')].filter(w=>k.has(w)).length;if(n>score){score=n;best=c.values.A;}}return best;};
- const suggest=(e:K.KimaiEntry)=>Object.entries(map).find(([,m])=>m.project===e.project&&m.activity===e.activity)?.[0]??Object.entries(map).find(([,m])=>m.project===e.project)?.[0]??byName(e);
+ // Exact activity match first, then a name match, then any case already linked to the same Kimai project.
+ const suggest=(e:K.KimaiEntry)=>Object.entries(map).find(([,m])=>m.project===e.project&&m.activity===e.activity)?.[0]||byName(e)||Object.entries(map).find(([,m])=>m.project===e.project)?.[0]||'';
  const fresh=remote.filter(e=>!linkedIds.has(e.id)).map(e=>{const match=rows.find((r:any)=>!linkedSessions.has(r.values.A)&&excelDate(r.values.B)===e.date&&clockTime(r.values.J)===e.start);return {...e,suggested_case:match?.values.C??suggest(e),match_session:match?.values.A??null};});
  const matched=new Set(fresh.map(f=>f.match_session).filter(Boolean));
  const toSend=rows.filter((r:any)=>!linkedSessions.has(r.values.A)&&!matched.has(r.values.A)&&['T1','T2','T3'].includes(r.values.I)&&map[r.values.C]&&excelDate(r.values.B)>=since&&clockTime(r.values.J)&&clockTime(r.values.K))

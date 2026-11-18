@@ -310,7 +310,7 @@ export default function Studio({displayName}:{displayName:string}){
  }
 }
 // Built-in tutorial clips, recorded by the scripts in source/tutorials/. Silent looping MP4s, shown like GIFs.
-const tutorials=[{title:'Log a session',src:'/tutorials/log-session.mp4'},{title:'Connect Kimai',src:'/tutorials/connect-kimai.mp4'},{title:'Import from Kimai',src:'/tutorials/import-kimai.mp4'}];
+const tutorials=[{title:'Log a session',src:'/tutorials/log-session.mp4'},{title:'Connect Kimai',src:'/tutorials/connect-kimai.mp4'},{title:'Import from Kimai',src:'/tutorials/import-kimai.mp4'},{title:'Get a Kimai API token',src:'/tutorials/kimai-api-token.mp4'}];
 function Clip({src,label}:{src:string,label:string}){
  const ref=useRef<HTMLVideoElement>(null),[missing,setMissing]=useState(false),still=typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
  useEffect(()=>{if(!still)ref.current?.play().catch(()=>{});},[src]);
