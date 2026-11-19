@@ -303,3 +303,9 @@ body[data-scroll-locked]{margin-right:0!important}
  .spin{animation:none}
  details>summary svg,.more summary::before{transition:none}
 }
+
+.hours-input{position:relative}
+.hours-input>span{position:absolute;right:30px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none}
+/* Phone sidebar sheet: line items up with the brand. */
+[data-mobile=true] [data-sidebar=menu]{padding:0 12px}
+[data-mobile=true] [data-sidebar=menu-button]{height:40px;font-size:15px}
