@@ -4,8 +4,7 @@ button,a,input,textarea{touch-action:manipulation}
 button:not(:disabled),a{cursor:pointer}
 button:focus-visible,a:focus-visible,[tabindex]:focus-visible,summary:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
 ::selection{background:var(--accent);color:var(--accent-foreground)}
-.mono{white-space:nowrap}
-.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted-foreground)}
+.mono{white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted-foreground)}
 .muted{color:var(--muted-foreground);font-size:13px}
 .num{font-variant-numeric:tabular-nums;white-space:nowrap}
 .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -62,8 +61,7 @@ h2{font-size:15px;font-weight:600}
 .list>.case-row:first-child{border-top:0}
 .case-row.with-action{grid-template-columns:118px minmax(0,1fr) minmax(0,200px) auto auto 28px;cursor:pointer}
 button.case-name{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}
-.row-action{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;color:var(--primary);opacity:0}
-.row-action{opacity:.75}
+.row-action{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;color:var(--primary);opacity:.75}
 .case-row:hover .row-action,.row-action:focus-visible{opacity:1}
 .row-action:hover{background:var(--accent)}
 button.case-row:hover,div.case-row:hover{background:var(--muted)}
@@ -205,7 +203,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .help-tabs{display:flex;flex-wrap:wrap;gap:6px}
 @media(max-width:760px){.review-row,.map-row{grid-template-columns:1fr}}
 
-/* Round 2 fixes */
+/* Dialog layout and Kimai review rows */
 .entry-dialog [data-slot=dialog-header]{text-align:left}
 .entry-scroll,.form-rows,.form-row,.form-grid,.field{min-width:0}
 .field input[type=time]{min-width:0;width:100%}
@@ -215,7 +213,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .meta-line .mono{margin-right:4px}
 .head-actions{margin-left:auto;display:flex;gap:8px}
 .review-group{margin-bottom:14px}
-.review-group-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 6px;font-size:13px;font-weight:550}
+.review-group-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 6px;font-size:13px;font-weight:550;position:sticky;top:0;z-index:2;background:var(--popover);padding:6px 2px}
 .check{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
 .review-row.selectable{grid-template-columns:auto minmax(0,1fr) minmax(0,200px) auto}
 .dialog-actions .discard-q{margin-right:auto;font-size:14px;font-weight:550}
@@ -229,7 +227,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 }
 .choice-menu{width:var(--radix-select-trigger-width);min-width:max(var(--radix-select-trigger-width),240px);max-width:min(420px,92vw)}
 
-/* Round 3 fixes */
+/* Disclosure, History rows, shortcuts, narrow top bar */
 html{scrollbar-gutter:stable}
 details.more>summary{list-style:none;display:flex;align-items:center;gap:6px}
 details.more>summary::-webkit-details-marker{display:none}
@@ -256,24 +254,20 @@ kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;paddi
 .narrow-only{display:none}
 @media(max-width:760px){.wide-only{display:none}.narrow-only{display:inline}}
 
-/* Round 4 fixes */
+/* More summary, sticky import bar, collapsed sidebar */
 .more summary{width:auto;max-width:100%;overflow:hidden}
 .more summary .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.review-dialog .entry-scroll{padding-bottom:0}
-.sticky-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px;margin-top:8px;background:var(--popover);border-top:1px solid var(--border)}
+.review-dialog .entry-scroll{padding-top:0;padding-bottom:0}
+.sticky-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px 12px;margin-top:8px;background:var(--popover);border-top:1px solid var(--border);z-index:3}
 .primary-confirm:not(:disabled):not(.armed){border-color:var(--primary);color:var(--primary)}
 [data-collapsible=icon] [data-sidebar=menu-button][data-active=true]{background:var(--accent);color:var(--accent-foreground)}
 
-/* Round 5 fixes */
+/* Scroll lock, definitions, time pair */
 body[data-scroll-locked]{margin-right:0!important}
-.review-group-head{position:sticky;top:0;z-index:2;background:var(--popover);padding:6px 2px}
-.sticky-bar{padding:10px 2px 12px}
 .tip-pop{width:auto;max-width:260px;padding:8px 10px;font-size:13px}
 @media(max-width:760px){.form-row.times{grid-template-columns:1fr 1fr!important}}
 
-/* Round 6 fixes */
-.sticky-bar{z-index:3;background:var(--popover)}
-.review-dialog .entry-scroll{padding-top:0}
+/* Help dialog and select values */
 .review-dialog .group:first-child{padding-top:4px}
 .help-dialog{max-height:92dvh;overflow-y:auto}
 .help-dialog .clip{max-height:calc(100dvh - 240px);object-fit:contain;width:100%}
