@@ -55,3 +55,4 @@ function payload(f:SyncFields){
 }
 export async function create(cfg:KimaiConfig,f:SyncFields){const {body}=await call(cfg,'/api/timesheets',{method:'POST',body:payload(f)});return toEntry(body)!;}
 export async function update(cfg:KimaiConfig,id:number,f:SyncFields){const {body}=await call(cfg,`/api/timesheets/${id}`,{method:'PATCH',body:payload(f)});return toEntry(body)!;}
+export async function remove(cfg:KimaiConfig,id:number){await call(cfg,`/api/timesheets/${id}`,{method:'DELETE'});}

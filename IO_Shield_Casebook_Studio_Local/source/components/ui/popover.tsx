@@ -21,10 +21,13 @@ function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
+  portal = true,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+}: React.ComponentProps<typeof PopoverPrimitive.Content> & {portal?: boolean}) {
+  // portal={false} keeps the content inside its parent, e.g. a picker inside a dialog.
+  const Wrap = portal ? PopoverPrimitive.Portal : React.Fragment
   return (
-    <PopoverPrimitive.Portal>
+    <Wrap>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}
@@ -35,7 +38,7 @@ function PopoverContent({
         )}
         {...props}
       />
-    </PopoverPrimitive.Portal>
+    </Wrap>
   )
 }
 

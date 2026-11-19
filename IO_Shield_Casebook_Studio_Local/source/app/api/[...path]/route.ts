@@ -1,6 +1,6 @@
 import {db,bucket,identity,owned} from '@/lib/store';
 import {parseWorkbook,exportWorkbook} from '@/lib/workbook';
-import {validateEntry,rowsFor,excelDate,clockTime,domainCode,nextNumberedId} from '@/lib/casebook';
+import {validateEntry,rowsFor,excelDate,clockTime,domainCode,nextNumberedId,editable} from '@/lib/casebook';
 import * as K from '@/lib/kimai';
 import {zipSync,strToU8} from 'fflate';
 const safeName=(v:string)=>v.replace(/[^A-Za-z0-9._-]/g,'_').slice(0,140)||'file';
@@ -32,6 +32,21 @@ async function saveEntry(b:any,owner:string,sheet:string,row:number,values:Recor
   ]);if(results[0].meta.changes!==1)throw json({error:'Another update arrived first. Reload before saving.'},409);
  b.revision=revision;b.edits=JSON.stringify(edits);b.updated=timestamp;
  return {revision,edits,updated:timestamp};
+}
+
+// Clears a row (the record disappears from the app and the export). History keeps the old values, so it can be restored.
+async function deleteEntry(b:any,owner:string,sheet:string,row:number,source?:string){
+ const data=JSON.parse(b.parsed),edits=JSON.parse(b.edits);
+ if(!editable[sheet]||!data.sheets[sheet])throw Error('Unsupported sheet.');
+ const current=rowsFor(data,edits,sheet).find((r:any)=>r.row===row);if(!current)throw Error('That record no longer exists.');
+ const cleared=Object.fromEntries(editable[sheet].map((c:string)=>[c,'']));edits[sheet]??={};edits[sheet][row]={...edits[sheet][row],...cleared};
+ const timestamp=now(),revision=b.revision+1;
+ const results=await db().batch([
+  db().prepare('UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?').bind(JSON.stringify(edits),timestamp,b.id,owner,b.revision),
+  db().prepare('INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1').bind(crypto.randomUUID(),b.id,owner,revision,JSON.stringify({sheet,row,before:current.values,after:cleared,deleted:true,...(source?{source}:{})}),timestamp),
+ ]);if(results[0].meta.changes!==1)throw json({error:'Another update arrived first. Reload before deleting.'},409);
+ b.revision=revision;b.edits=JSON.stringify(edits);b.updated=timestamp;
+ return {revision,edits,updated:timestamp,before:current.values};
 }
 
 // ---- Kimai two-way sync ----
@@ -126,25 +141,38 @@ async function kimaiRoute(path:string[],method:string,request:Request,owner:stri
  const cfg=await kimaiConfig();if(!cfg)throw Error('Connect Kimai first.');
  const body:any=await request.json();
  if(path[3]==='map'&&method==='PUT'){
+  if(body.case_id&&body.project===null){await db().prepare('DELETE FROM kimai_case_map WHERE book_id=? AND case_id=?').bind(b.id,body.case_id).run();return json({map:await caseMap(b.id)});}
   if(!body.case_id||!Number.isInteger(body.project)||!Number.isInteger(body.activity))throw Error('Choose a Kimai project and activity.');
   await db().prepare('INSERT INTO kimai_case_map (book_id,case_id,project,activity) VALUES (?,?,?,?) ON CONFLICT(book_id,case_id) DO UPDATE SET project=excluded.project,activity=excluded.activity').bind(b.id,body.case_id,body.project,body.activity).run();
   return json({map:await caseMap(b.id)});
  }
  if(path[3]==='import'&&method==='POST'){
-  let done=0;
+  let done=0;const created:string[]=[],linked:string[]=[];
   for(const item of (body.items??[]).slice(0,200)){
    const e=await K.entry(cfg,+item.kimai_id);if(!e)continue;
    if(await db().prepare('SELECT 1 FROM kimai_links WHERE book_id=? AND kimai_id=?').bind(b.id,e.id).first())continue;
    let sessionId=item.link_session as string|undefined;
-   if(!sessionId){const {row,values}=importValues(b,e,item.case_id);await saveEntry(b,owner,SESSIONS,row,values,'kimai');sessionId=values.A;}
+   if(!sessionId){const {row,values}=importValues(b,e,item.case_id);await saveEntry(b,owner,SESSIONS,row,values,'kimai');sessionId=values.A;created.push(values.A);}else linked.push(sessionId);
    const map=await caseMap(b.id),caseId=sessionRows(b).find((r:any)=>r.values.A===sessionId)?.values.C;
    if(caseId&&!map[caseId]){await db().prepare('INSERT INTO kimai_case_map (book_id,case_id,project,activity) VALUES (?,?,?,?)').bind(b.id,caseId,e.project,e.activity).run();map[caseId]={project:e.project,activity:e.activity};}
    const row=sessionRows(b).find((r:any)=>r.values.A===sessionId);
    await saveLink(b.id,sessionId!,e.id,appFields(row,map,K.entryFields(e))??K.entryFields(e),K.entryFields(e));done++;
   }
-  return json({imported:done,revision:b.revision,edits:JSON.parse(b.edits),updated:b.updated});
+  return json({imported:done,created,linked,revision:b.revision,edits:JSON.parse(b.edits),updated:b.updated});
  }
  if(path[3]==='send'&&method==='POST'){const r=await afterSessionSave(b,String(body.session_id),true);if(r?.status==='error')throw Error(r.error);return json(r??{});}
+ // Undo an import: unlink, and remove the sessions the import created. Kimai is not touched.
+ if(path[3]==='unimport'&&method==='POST'){
+  for(const id of [...(body.created??[]),...(body.linked??[])])await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,String(id)).run();
+  for(const id of body.created??[]){const row=sessionRows(b).find((r:any)=>r.values.A===id);if(row)await deleteEntry(b,owner,SESSIONS,row.row,'kimai');}
+  return json({ok:true,revision:b.revision,edits:JSON.parse(b.edits),updated:b.updated});
+ }
+ // Undo a send: delete the Kimai entry this app created and unlink the session.
+ if(path[3]==='unsend'&&method==='POST'){
+  const link=(await links(b.id)).find(l=>l.session_id===body.session_id);if(!link)throw Error('That session is not linked to Kimai.');
+  await K.remove(cfg,link.kimai_id);await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,link.session_id).run();
+  return json({ok:true});
+ }
  if(path[3]==='resolve'&&method==='POST'){
   const link=(await links(b.id)).find(l=>l.session_id===body.session_id);if(!link)throw Error('That session is not linked to Kimai.');
   if(body.keep==='unlink'){await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,link.session_id).run();return json({ok:true});}
@@ -183,6 +211,12 @@ async function handle(request:Request){try{
   const saved=await saveEntry(b,owner,sheet,row,values);
   const kimai=sheet==='Session Ledger'?await afterSessionSave(b,values.A,!!body.kimai):undefined;
   return json({...saved,kimai});
+ }
+ if(path[2]==='entries'&&path[3]==='delete'&&method==='POST'){
+  const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload first.'},409);
+  const r=await deleteEntry(b,owner,body.sheet,+body.row);
+  if(body.sheet==='Session Ledger'&&r.before.A)await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,r.before.A).run();
+  return json(r);
  }
  if(path[2]==='files'&&method==='POST'){
   const totals=await db().prepare('SELECT SUM(bytes) AS bytes,COUNT(*) AS n FROM proof_files WHERE book_id=?').bind(b.id).first(),form=await request.formData(),f=form.get('file');if(!(f instanceof File))throw Error('Choose a supporting file.');
