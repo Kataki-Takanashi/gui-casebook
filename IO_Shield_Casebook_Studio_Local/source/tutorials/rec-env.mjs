@@ -41,6 +41,9 @@ async function seedCases(){
  const page=await (await browser.newContext({viewport:{width:1280,height:800}})).newPage();
  await page.addInitScript(()=>localStorage.setItem('theme','light'));
  await page.goto(BASE);
+ // Save, and if the form refuses, say why instead of waiting forever.
+ const save=async()=>{await page.locator('.dialog-actions .primary-button').click();const dialog=page.locator('[role=dialog].entry-dialog').first();
+  await Promise.race([dialog.waitFor({state:'detached'}),page.locator('.form-error').waitFor().then(async()=>{throw Error('Seeding form refused: '+await page.locator('.form-error').textContent());})]);};
  const pick=async(label,option)=>{await page.getByRole('combobox',{name:label}).click();await page.getByRole('option',{name:option,exact:true}).click();};
  const newCase=async(title,type,did,parent)=>{
   await page.getByRole('navigation').or(page.locator('[data-sidebar]')).getByText('Cases',{exact:true}).first().click();
@@ -52,8 +55,7 @@ async function seedCases(){
   if(parent){await page.getByRole('combobox',{name:'Parent project'}).click();await page.getByRole('option').filter({hasText:parent}).first().click();}
   await page.getByLabel('What I Did').fill(did);
   await page.getByRole('textbox',{name:'Scope / Permission'}).fill('Own lab equipment');
-  await page.getByRole('button',{name:'Save',exact:true}).click();
-  await page.locator('[role=dialog].entry-dialog').first().waitFor({state:'detached'});
+  await save();
  };
  await newCase('Lab Network Build','Parent Project','Built a small lab network to practice on.');
  await newCase('Network Inventory','Project Case','Listed every device on the lab network.','Lab Network Build');
@@ -66,8 +68,7 @@ async function seedCases(){
  await page.getByLabel('What I Worked On').fill('Mapped the switch ports');
  await page.getByLabel('Start',{exact:true}).fill('19:00');
  await page.getByLabel('End',{exact:true}).fill('20:30');
- await page.getByRole('button',{name:'Save',exact:true}).click();
- await page.locator('[role=dialog].entry-dialog').first().waitFor({state:'detached'});
+ await save();
  await page.waitForTimeout(500);
  await browser.close();
 }
