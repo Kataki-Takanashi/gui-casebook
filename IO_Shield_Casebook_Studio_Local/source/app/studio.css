@@ -357,3 +357,7 @@ body[data-scroll-locked]{margin-right:0!important}
 @media (prefers-reduced-motion:reduce){.spin{animation:spin-pulse 1s ease-in-out infinite alternate}}
 .more[open] summary .muted{display:none}
 @media(max-width:760px){.dialog-actions .discard-q{flex-basis:100%}}
+.field-error{font-size:13px;color:var(--destructive);animation:fade-in 150ms ease-out}
+.noask{font-size:13px;color:var(--muted-foreground);gap:6px}
+.timer-run{gap:6px;font-variant-numeric:tabular-nums}
+.timer-dot{width:8px;height:8px;border-radius:999px;background:var(--destructive)}

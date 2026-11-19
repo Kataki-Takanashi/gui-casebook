@@ -53,6 +53,9 @@ async function deleteEntry(b:any,owner:string,sheet:string,row:number,source?:st
 // Each linked session stores what both sides looked like at the last sync. On sync, a side that changed since
 // then wins; if both changed it is a conflict for the user to resolve. Nothing is deleted on either side.
 const SESSIONS='Session Ledger',WINDOW_DAYS=120;
+// Proof upload limits are settings. Totals are per casebook: everything stored, across all uploads.
+const LIMIT_DEFAULTS={fileMb:10,totalMb:40,files:100},LIMIT_MAX={fileMb:200,totalMb:5000,files:2000};
+async function limits(){const out:any={};for(const k of Object.keys(LIMIT_DEFAULTS) as (keyof typeof LIMIT_DEFAULTS)[])out[k]=+((await setting('limit_'+k))??LIMIT_DEFAULTS[k]);return out as typeof LIMIT_DEFAULTS;}
 async function setting(key:string){return (await db().prepare('SELECT value FROM app_settings WHERE key=?').bind(key).first())?.value as string|undefined;}
 async function setSetting(key:string,value:string|null){if(value===null)await db().prepare('DELETE FROM app_settings WHERE key=?').bind(key).run();else await db().prepare('INSERT INTO app_settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key,value).run();}
 async function kimaiConfig():Promise<K.KimaiConfig|null>{const url=await setting('kimai_url'),token=await setting('kimai_token');return url&&token?{url,token}:null;}
@@ -196,6 +199,15 @@ async function handle(request:Request){try{
  const owner=await identity(),path=new URL(request.url).pathname.split('/').slice(2),method=request.method;
  if(method!=='GET'){const origin=request.headers.get('origin');if(origin&&origin!==new URL(request.url).origin)throw new Response('Cross-site writes are not allowed.',{status:403});}
  const kimaiResponse=await kimaiRoute(path,method,request,owner);if(kimaiResponse)return kimaiResponse;
+ // The session timer lives in the app's own data, so it keeps running across reloads and works without Kimai.
+ if(path[0]==='settings'&&path[1]==='timer'){
+  if(method==='PUT'){const body:any=await request.json();if(body.start&&isNaN(Date.parse(body.start)))throw Error('Invalid start time.');await setSetting('timer_start',body.start||null);await setSetting('timer_case',body.start&&body.case?String(body.case):null);}
+  return json({start:(await setting('timer_start'))??null,case:(await setting('timer_case'))??null});
+ }
+ if(path[0]==='settings'&&path[1]==='limits'){
+  if(method==='PUT'){const body:any=await request.json();for(const k of Object.keys(LIMIT_DEFAULTS) as (keyof typeof LIMIT_DEFAULTS)[]){const v=Math.round(+body[k]);if(!(v>=1&&v<=LIMIT_MAX[k]))throw Error(`Enter a number from 1 to ${LIMIT_MAX[k]}.`);await setSetting('limit_'+k,String(v));}}
+  return json({...await limits(),max:LIMIT_MAX});
+ }
  if(path[0]==='books'&&!path[1]){
   if(method==='GET'){const r=await db().prepare('SELECT id,name,revision,created,updated FROM casebooks WHERE owner=? ORDER BY updated DESC').bind(owner).all();return json(r.results);}
   if(method==='POST'){
@@ -226,13 +238,17 @@ async function handle(request:Request){try{
   if(body.sheet==='Session Ledger'&&r.before.A)await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,r.before.A).run();
   return json(r);
  }
- if(path[2]==='files'&&method==='POST'){
+ if(path[2]==='files'&&!path[3]&&method==='POST'){
   const totals=await db().prepare('SELECT SUM(bytes) AS bytes,COUNT(*) AS n FROM proof_files WHERE book_id=?').bind(b.id).first(),form=await request.formData(),f=form.get('file');if(!(f instanceof File))throw Error('Choose a file.');
   if(!/\.(pdf|png|jpg|jpeg|webp|txt|md|csv|json|log|pcap|pcapng|conf|yaml|yml|docx|xlsx)$/i.test(f.name))throw Error(`${f.name} can't be attached. Use a PDF, image, text, log, config, Word, Excel or packet capture file.`);
-  if(f.size<=0)throw Error(`${f.name} is empty.`);if(f.size>10*1024*1024)throw Error(`${f.name} is over 10 MB.`);if((totals.bytes??0)+f.size>40*1024*1024||totals.n>=100)throw Error('A casebook can hold up to 100 proof files (40 MB in all).');
+  const lim=await limits();if(f.size<=0)throw Error(`${f.name} is empty.`);if(f.size>lim.fileMb*1024*1024)throw Error(`${f.name} is over ${lim.fileMb} MB.`);if((totals.bytes??0)+f.size>lim.totalMb*1024*1024||totals.n>=lim.files)throw Error(`This casebook already holds its limit of proof files (${lim.files} files, ${lim.totalMb} MB in all). You can raise it under Upload limits.`);
   const bytes=await f.arrayBuffer(),hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(n=>n.toString(16).padStart(2,'0')).join(''),id=crypto.randomUUID(),name=safeName(f.name),key=owner+'/'+b.id+'/proof/'+id,created=now();await bucket().put(key,bytes);
   await db().prepare('INSERT INTO proof_files (id,book_id,owner,name,object_key,hash,bytes,created) VALUES (?,?,?,?,?,?,?,?)').bind(id,b.id,owner,name,key,hash,f.size,created).run();return json({id,name,hash,bytes:f.size,created,ref:`attachments/${id}/${name}`},201);
  }
+ // Files uploaded in a form that was then cancelled: remove them, but only if no proof record points to them.
+ if(path[2]==='files'&&path[3]==='forget'&&method==='POST'){const body:any=await request.json(),proofRows=rowsFor(JSON.parse(b.parsed),JSON.parse(b.edits),'Evidence Index');let removed=0;
+  for(const id of (body.ids??[]).map(String).slice(0,50)){if(proofRows.some((r:any)=>(r.values.F??'').includes(id)))continue;const f=await db().prepare('SELECT object_key FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).first();if(!f)continue;await bucket().delete(f.object_key);await db().prepare('DELETE FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).run();removed++;}
+  return json({removed});}
  if(path[2]==='history'&&method==='GET'){const r=await db().prepare('SELECT revision,detail,created FROM casebook_events WHERE book_id=? ORDER BY revision DESC LIMIT 100').bind(b.id).all();return json(r.results);}
  if((path[2]==='export'||path[2]==='bundle')&&method==='GET'){
   const o=await bucket().get(b.original_key);if(!o)throw Error('The original workbook is unavailable.');const bytes=exportWorkbook(new Uint8Array(await o.arrayBuffer()),edits),filename=b.name.replace(/\.xlsx$/i,'')+`_revision_${b.revision}.xlsx`;

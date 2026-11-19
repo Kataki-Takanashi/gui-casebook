@@ -62,8 +62,10 @@ Do not expose this version to the internet or treat it as a multi-user server.
 
 CURRENT LIMITS
 - Imports support the supplied v3 workbook layout, not arbitrary Excel files.
-- Up to 20 casebooks, 30 MB per workbook, 10 MB per attachment, and 100 proof
-  files totaling 40 MB per casebook.
+- Up to 20 casebooks and 30 MB per workbook.
+- Proof files: by default 10 MB per file, and 100 files or 40 MB in all per
+  casebook (everything stored, not per upload). Change these under casebook
+  menu > Upload limits. Files from a form you cancel are removed again.
 - Entry capacity follows the template's fixed summary ranges: 250 cases,
   500 sessions, 750 proof records, 1,000 skill claims.
 - T4/T5 hours remain blank. New claims remain pending review.

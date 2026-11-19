@@ -1,6 +1,6 @@
 'use client';
-import {useEffect,useMemo,useRef,useState} from 'react';
-import {Upload,Plus,Download,FolderOpen,Clock,Layers,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil,Sun,Moon,RefreshCw,Link2,Play,Pause,CircleHelp,FileSpreadsheet,FileArchive,FileDown,Trash2} from 'lucide-react';
+import React,{useEffect,useId,useMemo,useRef,useState} from 'react';
+import {Upload,Plus,Download,FolderOpen,Clock,Layers,Search,Shield,FileText,Check,ChevronsUpDown,ChevronDown,ChevronLeft,History,Paperclip,X,Pencil,Sun,Moon,RefreshCw,Link2,Play,Pause,Timer,CircleHelp,FileSpreadsheet,FileArchive,FileDown,Trash2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Textarea} from '@/components/ui/textarea';
@@ -83,7 +83,7 @@ export default function Studio({displayName}:{displayName:string}){
  const [form,setForm]=useState<Form|null>(null),[values,setValues]=useState<Record<string,string>>({}),[pending,setPending]=useState<PendingFile[]>([]),[formError,setFormError]=useState(''),[saving,setSaving]=useState(false),[history,setHistory]=useState<any[]>([]),[portfolio,setPortfolio]=useState<Row|null>(null),[publicCheck,setPublicCheck]=useState(false),[dragging,setDragging]=useState(false);
  type Kimai={connected:boolean,url:string,user:string|null};type KCatalog={projects:{id:number,name:string}[],activities:{id:number,name:string,project:number|null}[]};
  const [kimai,setKimai]=useState<Kimai|null>(null),[kstatus,setKstatus]=useState<any>(null),[kcatalog,setKcatalog]=useState<KCatalog|null>(null),[kimaiView,setKimaiView]=useState<''|'connect'|'review'>(''),[ksyncing,setKsyncing]=useState(false),[kchoice,setKchoice]=useState(''),[kpick,setKpick]=useState<Record<number,string>>({});
- const [initial,setInitial]=useState(''),[confirmDiscard,setConfirmDiscard]=useState(false),[kTouched,setKTouched]=useState(false);
+ const [initial,setInitial]=useState(''),[confirmDiscard,setConfirmDiscard]=useState(false),[confirmKimai,setConfirmKimai]=useState(false),[fieldErrors,setFieldErrors]=useState<Record<string,string>>({}),[conflict,setConflict]=useState<{fields:string[],theirs:Record<string,string>}|null>(null),[timer,setTimer]=useState<{start:string|null,case:string|null}>({start:null,case:null}),[tick,setTick]=useState(0),[lim,setLim]=useState<any>({fileMb:10,totalMb:40,files:100}),[limOpen,setLimOpen]=useState(false),[noAsk,setNoAsk]=useState(false),[kTouched,setKTouched]=useState(false);
  const [moreOpen,setMoreOpen]=useState(false),[errorRetry,setErrorRetry]=useState<(()=>void)|null>(null);
  const [kSel,setKSel]=useState<Record<number,boolean>>({}),[kEdit,setKEdit]=useState<Record<number,boolean>>({});
  const [menuOpen,setMenuOpen]=useState(false),[helpOpen,setHelpOpen]=useState(false),[helpClip,setHelpClip]=useState(0);
@@ -109,7 +109,8 @@ export default function Studio({displayName}:{displayName:string}){
  async function refreshBooks(){const list=await api('books');setBooks(list);return list;}
  async function openBook(id:string){setBusy(true);setError('');try{setBook(await api('books/'+id));setSearch('');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
  useEffect(()=>{refreshBooks().then(list=>list.length&&openBook(list[0].id)).catch(e=>setError(e.message)).finally(()=>setLoaded(true));},[]);
- useEffect(()=>{api('kimai').then(setKimai).catch(()=>{});},[]);
+ useEffect(()=>{api('kimai').then(setKimai).catch(()=>{});api('settings/limits').then(setLim).catch(()=>{});api('settings/timer').then(setTimer).catch(()=>{});},[]);
+ useEffect(()=>{if(!timer.start)return;const t=setInterval(()=>setTick(n=>n+1),1000);return()=>clearInterval(t);},[timer.start]);
  // Shortcuts when not typing: L log session, N new case, / search, ? help.
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{const t=e.target as HTMLElement;if(e.metaKey||e.ctrlKey||e.altKey||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable||document.querySelector('[role=dialog]')||!book)return;
   if(e.key==='l'&&cases.some(r=>!isParent(r))){e.preventDefault();start(SESSIONS);}else if(e.key==='n'){e.preventDefault();start(CASES);}else if(e.key==='?'){e.preventDefault();setHelpOpen(true);}else if(e.key==='/'){e.preventDefault();const focus=()=>document.querySelector<HTMLInputElement>('.search input')?.focus();if(document.querySelector('.search input'))focus();else{go('#/');setTimeout(focus,80);}}};
@@ -158,7 +159,7 @@ export default function Studio({displayName}:{displayName:string}){
    if(sheet===CLAIMS)init=inferFromCase(sheet,fallbackCase,{...init,C:today(),D:'01',G:'Training',J:'1',K:'',L:'No',Q:'No'});
    if(sheet===PORTFOLIO)init=inferFromCase(sheet,fallbackCase,{...init,E:'Project Page',G:'No'});
   }
-  setValues(init);setInitial(JSON.stringify(init));setConfirmDiscard(false);setKTouched(false);setForm({sheet,row:rowNum,existing:!!row});setMoreOpen(layouts[sheet].more.some(c=>required[sheet].includes(c)&&!init[c]));
+  setValues(init);setInitial(JSON.stringify(init));setConfirmDiscard(false);setConfirmKimai(false);setFieldErrors({});setConflict(null);setKTouched(false);setForm({sheet,row:rowNum,existing:!!row});setMoreOpen(layouts[sheet].more.some(c=>required[sheet].includes(c)&&!init[c]));
   if(sheet===SESSIONS)setKchoice(row?'':kDefault(init.C,init.I));
  }
  const dirty=()=>!!form&&(JSON.stringify(values)!==initial||pending.length>0);
@@ -184,7 +185,7 @@ export default function Studio({displayName}:{displayName:string}){
  const moreSummary=(sheet:string)=>{const skip=new Set(['A',...longCols(sheet)]);return layouts[sheet].more.filter(c=>!skip.has(c)&&values[c]&&values[c]!=='No').map(c=>{const v=values[c],l=labelFor(sheet,c);return l==='Work Level'?levels[+v]?.slice(4):l.includes('Domain')?domainLabel(v).replace(/^\d+ · /,''):v;}).filter(Boolean).slice(0,4).join(' · ');};
  const longCols=(sheet:string)=>(editable[sheet]??[]).filter(c=>longFields.includes(labelFor(sheet,c)));
  function withParent(next:Record<string,string>,parentId:string){const p=findCase(parentId);next.B=p?.values.A??'';next.A=nextCaseId(cases.map(r=>r.values.A),p?.values.A??'',new Date().getFullYear());if(p)Object.assign(next,{D:next.D==='Training Case'?'Project Case':next.D,E:p.values.E||next.E,H:domainCode(p.values.H??'')||next.H,I:domainCode(p.values.I??'')||next.I,J:p.values.J||next.J});return next;}
- function change(col:string,v:string){setFormError('');setValues(old=>{
+ function change(col:string,v:string){setFormError('');setConfirmKimai(false);setFieldErrors(e=>{if(!(col in e))return e;const n={...e};delete n[col];return n;});setValues(old=>{
   if(!form)return old;const sheet=form.sheet;let next={...old,[col]:v};
   if(!form.existing&&col===caseCol(sheet)&&sheet!==CASES){next=inferFromCase(sheet,v,next);}
   if(sheet===CASES&&col==='B'&&!form.existing)next=withParent(next,v);
@@ -197,9 +198,9 @@ export default function Studio({displayName}:{displayName:string}){
   if(!book||!form)return;setSaving(true);setFormError('');
   // Check type and size here so a big file isn't sent only to be refused; say which files were skipped.
   const ok=/\.(pdf|png|jpg|jpeg|webp|txt|md|csv|json|log|pcap|pcapng|conf|yaml|yml|docx|xlsx)$/i,skipped:string[]=[];
-  list=Array.from(list).filter(f=>{const why=!ok.test(f.name)?'not a supported file type':f.size===0?'empty':f.size>10*1024*1024?'over 10 MB':'';if(why)skipped.push(`${f.name} (${why})`);return !why;});
+  list=Array.from(list).filter(f=>{const why=!ok.test(f.name)?'not a supported file type':f.size===0?'empty':f.size>lim.fileMb*1024*1024?`over ${lim.fileMb} MB`:'';if(why)skipped.push(`${f.name} (${why})`);return !why;});
   if(skipped.length)setFormError(`Not attached: ${skipped.join(', ')}.`);
-  try{for(const file of list){const f=new FormData();f.set('file',file);const r=await api(`books/${book.id}/files`,{method:'POST',body:f});setBook(b=>b&&{...b,files:[r,...b.files]});
+  try{for(const file of list){const f=new FormData();f.set('file',file);const r=await api(`books/${book.id}/files`,{method:'POST',body:f});setBook(b=>b&&{...b,files:[r,...b.files]});formUploads.current.push(r.id);
    if(form.sheet===PROOF){setValues(v=>({...v,F:r.ref,G:'SHA256:'+r.hash,D:proofTypeFor(r.name),E:v.E||r.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ')}));}
    else setPending(p=>[...p,{id:r.id,name:r.name,hash:r.hash,ref:r.ref}]);}}
   catch(e){setFormError(m=>(m?m+' ':'')+(e as Error).message);}finally{setSaving(false);if(fileRef.current)fileRef.current.value='';}
@@ -217,11 +218,27 @@ export default function Studio({displayName}:{displayName:string}){
  // The record a save just wrote gets a brief highlight so it's easy to spot in the list.
  const [landed,setLanded]=useState('');
  useEffect(()=>{if(!landed)return;const t=setTimeout(()=>setLanded(''),1400);return()=>clearTimeout(t);},[landed]);
+ // Files uploaded in a form that is then closed without saving are removed again, so they don't count toward the limits.
+ const formUploads=useRef<string[]>([]);
+ useEffect(()=>{if(form||!book||!formUploads.current.length)return;const ids=formUploads.current;formUploads.current=[];send(`books/${book.id}/files/forget`,{ids}).then(r=>{if(r.removed)api('books/'+book.id).then(fresh=>setBook(b=>b&&{...b,files:fresh.files})).catch(()=>{});}).catch(()=>{});},[form]);
+ // Timer: start it when the work starts; stopping opens Log session with the date and times filled in.
+ const pad=(n:number)=>String(n).padStart(2,'0'),hm=(d:Date)=>`${pad(d.getHours())}:${pad(d.getMinutes())}`,ymd=(d:Date)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+ const elapsed=timer.start?Math.max(0,Math.floor((Date.now()-Date.parse(timer.start))/1000)):0;void tick;
+ const clock=`${Math.floor(elapsed/3600)}:${pad(Math.floor(elapsed/60)%60)}:${pad(elapsed%60)}`;
+ async function startTimer(){try{setTimer(await send('settings/timer',{start:new Date().toISOString(),case:view==='case'?openCase:''},'PUT'));}catch(e){toast.error((e as Error).message);}}
+ async function stopTimer(){if(!timer.start)return;const a=new Date(timer.start),b=new Date(),caseId=timer.case&&findCase(timer.case)?timer.case:undefined;
+  try{setTimer(await send('settings/timer',{start:null},'PUT'));}catch(e){toast.error((e as Error).message);return;}
+  start(SESSIONS,undefined,caseId);setValues(v=>({...v,B:ymd(a),J:hm(a),K:hm(b),L:hm(a)===hm(b)?'':hoursBetween(hm(a),hm(b)),I:'T1'}));}
+ async function cancelTimer(){try{setTimer(await send('settings/timer',{start:null},'PUT'));}catch(e){toast.error((e as Error).message);}}
  const kmapFor=(caseId:string)=>kstatus?.map?.[caseId];
  // Only timed (T1) sessions go to Kimai by default; rebuilt time is added only when picked.
  const kDefault=(caseId:string,tclass:string)=>{const m=kmapFor(caseId);return m&&tclass==='T1'?`${m.project}:${m.activity}`:'';};
  const kOptions:[string,string][]=(kcatalog?.activities??[]).map(a=>[`${a.project??''}:${a.id}`,`${kcatalog?.projects.find(p=>p.id===a.project)?.name??'Any project'} · ${a.name}`]);
  // Files dropped on a session or skill claim become proof records on the same case first.
+ // Editing a session that is already in Kimai changes the Kimai entry too, so ask first (unless the analyst turned that off).
+ function askThenSave(){const linked=form?.sheet===SESSIONS&&form.existing&&kimai?.connected&&kstatus?.linked?.includes(values.A);let skip=false;try{skip=localStorage.getItem('kimai-edit-noask')==='1';}catch{}
+  if(linked&&dirty()&&!skip&&!confirmKimai){setNoAsk(false);setConfirmKimai(true);return;}
+  if(confirmKimai&&noAsk){try{localStorage.setItem('kimai-edit-noask','1');}catch{}}setConfirmKimai(false);saveEntry();}
  async function saveEntry(){if(!form||!book)return;setSaving(true);setFormError('');
   try{
    let rev=book.revision,edits=book.edits,updated=book.updated;const vals={...values},caseId=vals[caseCol(form.sheet)];
@@ -246,10 +263,13 @@ export default function Studio({displayName}:{displayName:string}){
    if(r.kimai?.status==='error')toast.error(`Saved in your casebook, not in Kimai. ${r.kimai.error} You can add it from Kimai review.`);else if(r.kimai?.status==='conflict')toast.warning('Saved here. It also changed in Kimai, so check Kimai review.');
    if(r.kimai)kimaiSync(true);
    if(form.sheet===CASES&&!form.existing)goCase(vals.A);
-   setLanded(vals.A);toast.success(`${labels[form.sheet]} saved.`);
+   formUploads.current=[];setLanded(vals.A);toast.success(`${labels[form.sheet]} saved.`);
   }catch(e){let msg=(e as Error).message;
-   if(form.existing&&/another window/.test(msg)){try{const fresh=await api('books/'+book.id),now=rowsFor(fresh.data,fresh.edits,form.sheet).find(r=>r.row===form.row)?.values??{},was=JSON.parse(initial),norm=(c:string,v='')=>(dateColumns[form.sheet]??[]).includes(c)?excelDate(v):/Domain/.test(labelFor(form.sheet,c))?domainCode(v):form.sheet===SESSIONS&&(c==='J'||c==='K')?clockTime(v)||v:v,diff=editable[form.sheet].filter(c=>norm(c,now[c])!==(was[c]??'')&&norm(c,now[c])!==(values[c]??'')).map(c=>labelFor(form.sheet,c));if(diff.length)msg=`Changed in another window: ${diff.join(', ')}. Save again to keep your version, or Cancel to keep theirs.`;}catch{}}
-   setFormError(msg);markEmptyRequired();if(layouts[form.sheet].more.some(c=>msg.includes(labelFor(form.sheet,c))))setMoreOpen(true);try{setBook(await api('books/'+book.id));}catch{}}finally{setSaving(false);}
+   if(form.existing&&/another window/.test(msg)){try{const fresh=await api('books/'+book.id),now=rowsFor(fresh.data,fresh.edits,form.sheet).find(r=>r.row===form.row)?.values??{},was=JSON.parse(initial),norm=(c:string,v='')=>(dateColumns[form.sheet]??[]).includes(c)?excelDate(v):/Domain/.test(labelFor(form.sheet,c))?domainCode(v):form.sheet===SESSIONS&&(c==='J'||c==='K')?clockTime(v)||v:v,diffCols=editable[form.sheet].filter(c=>norm(c,now[c])!==(was[c]??'')&&norm(c,now[c])!==(values[c]??''));
+    if(diffCols.length){const theirs={...values};for(const c of editable[form.sheet])theirs[c]=norm(c,now[c]);setBook(fresh);setConflict({fields:diffCols.map(c=>labelFor(form.sheet,c)),theirs});return;}}catch{}}
+   setFormError(msg);markEmptyRequired();
+   {const errs:Record<string,string>={};for(const c of required[form.sheet])if(!values[c]?.trim())errs[c]='Fill this in.';
+    if(form.sheet===SESSIONS&&['T1','T2','T3'].includes(values.I)&&!(+values.L>0&&+values.L<=24))errs.L=values.L?'Enter hours above 0, up to 24.':'Enter start and end times, or hours.';setFieldErrors(errs);}if(layouts[form.sheet].more.some(c=>msg.includes(labelFor(form.sheet,c))))setMoreOpen(true);try{setBook(await api('books/'+book.id));}catch{}}finally{setSaving(false);}
  }
  // Delete clears the row; Undo writes the old values back into the same row.
  async function deleteEntry(){if(!form||!book)return;setSaving(true);
@@ -264,7 +284,9 @@ export default function Studio({displayName}:{displayName:string}){
  const unsaved=book&&exportedRev!==null?Math.max(0,book.revision-exportedRev):0;
  async function download(kind:string){if(!book)return;setBusy(true);setErrorRetry(()=>()=>download(kind));try{let r:Response;try{r=await fetch(`/api/books/${book.id}/${kind}`);}catch{throw Error('Casebook Studio is not running. Start it again; nothing here is lost.');}if(!r.ok)throw Error((await r.json() as any).error??'Download failed.');const name=/filename="([^"]+)"/.exec(r.headers.get('content-disposition')??'')?.[1]??'casebook.xlsx';downloadBlob(await r.blob(),name);setErrorRetry(null);if(kind!=='original'){setExportedRev(book.revision);try{localStorage.setItem('exported:'+book.id,String(book.revision));}catch{}}}catch(e){setError(`Download failed: ${(e as Error).message}`);}finally{setBusy(false);}}
 
- function field(col:string){
+ // Wraps each field so a failed save can say, right under it, what it needs.
+ function field(col:string){const el=fieldInner(col);const err=fieldErrors[col];return el&&err?React.cloneElement(el as React.ReactElement<any>,{error:err}):el;}
+ function fieldInner(col:string){
   const form=shown;if(!book||!form)return null;const sheet=form.sheet,label=labelFor(sheet,col),value=values[col]??'',set=(v:string)=>change(col,v),req=required[sheet].includes(col),wide=longFields.includes(label)||sheet===PORTFOLIO&&col==='M';
   if(sheet!==CASES&&col===caseCol(sheet))return <Field key={col} label="Case" required={req}><SearchChoice value={value} onChange={set} options={cases.filter(r=>!isParent(r)).map(r=>[r.values.A,r.values.A+' · '+r.values.C])} label="Case"/></Field>;
   if(sheet===CASES&&col==='B')return <Field key={col} label="Parent project"><SearchChoice value={findCase(value)?.values.A??value} onChange={set} placeholder="None" options={[['','None'],...cases.filter(r=>isParent(r)&&r.values.A!==values.A).map(r=>[r.values.A,r.values.A+' · '+r.values.C] as [string,string])]} label="Parent project"/></Field>;
@@ -302,18 +324,19 @@ export default function Studio({displayName}:{displayName:string}){
  const tone=(v:string)=>v==='Verified'||v==='Approved'?' ok':v==='Rejected'||v==='Safety / Scope Stop'?' bad':v==='Needs Correction'?' warn':'';
  const status=(v?:string)=>v?<span className={'badge'+tone(v)}>{v}</span>:null;
  // In lists, Pending Review is the default state, so only other states are shown there.
- const rowStatus=(v?:string)=>v&&v!=='Pending Review'?status(v):null;
+ const rowStatus=status;
  const fileFor=(ref?:string)=>book?.files.find(f=>ref?.includes(f.id));
  const parents=cases.filter(isParent),loose=cases.filter(r=>!isParent(r)&&!parentOf(r));
 
  return <SidebarProvider defaultOpen={typeof matchMedia==='undefined'||!matchMedia('(max-width:1023px)').matches} style={{'--sidebar-width':'13rem'} as React.CSSProperties}><Toaster position="bottom-right" theme={dark?'dark':'light'}/><CloseSheetOnRoute/>
  <Sidebar className="studio-sidebar" collapsible="icon"><SidebarHeader><div className="brand"><Shield size={18}/><strong>Casebook Studio</strong></div></SidebarHeader><SidebarContent><nav aria-label="Pages"><SidebarMenu>{nav.map(s=><SidebarMenuItem key={s.id}><SidebarMenuButton tooltip={s.label} aria-current={view===s.id||s.id==='cases'&&view==='case'?'page':undefined} isActive={view===s.id||s.id==='cases'&&view==='case'} onClick={()=>go(s.id==='cases'?'#/':`#/${s.id}`)} disabled={!book}><s.icon/><span>{s.label}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></nav><button className="theme-btn" onClick={toggleTheme} aria-label={dark?'Switch to light mode':'Switch to dark mode'} title={dark?'Switch to light mode':'Switch to dark mode'}>{dark?<Sun size={16}/>:<Moon size={16}/>}</button></SidebarContent></Sidebar>
  <SidebarInset><header className="topbar"><div className="topbar-left"><SidebarTrigger/>{view==='case'&&current&&<button className="crumb" onClick={()=>go('#/')}><ChevronLeft size={16}/>Cases</button>}</div>
-  <div className="topbar-actions"><button className="icon-btn" aria-label="Help" title="Help (?)" onClick={()=>setHelpOpen(true)}><CircleHelp size={17}/></button>{book&&<Button className="primary-button" size="sm" title={cases.some(r=>!isParent(r))?'Log session (L)':'Create a case first'} onClick={()=>start(SESSIONS)} disabled={busy||!cases.some(r=>!isParent(r))}><Clock size={15}/><span className="wide-only">Log session</span><span className="narrow-only">Log</span></Button>}
+  <div className="topbar-actions"><button className="icon-btn" aria-label="Help" title="Help (?)" onClick={()=>setHelpOpen(true)}><CircleHelp size={17}/></button>{book&&cases.some(r=>!isParent(r))&&(timer.start?<><Button variant="outline" size="sm" className="timer-run" title="Stop the timer and log the session" onClick={stopTimer}><span className="timer-dot" aria-hidden="true"/><span className="num">{clock}</span><span className="wide-only">Stop</span></Button><ConfirmButton className="icon-btn timer-cancel" ariaLabel="Cancel the timer" title="Cancel the timer" label={<X size={15}/>} confirmLabel="Cancel timer?" onConfirm={cancelTimer}/></>:<button className="icon-btn" aria-label="Start timer" title="Start timer" onClick={startTimer}><Timer size={17}/></button>)}{book&&<Button className="primary-button" size="sm" title={cases.some(r=>!isParent(r))?'Log session (L)':'Create a case first'} onClick={()=>start(SESSIONS)} disabled={busy||!cases.some(r=>!isParent(r))}><Clock size={15}/><span className="wide-only">Log session</span><span className="narrow-only">Log</span></Button>}
   <Popover open={menuOpen} onOpenChange={setMenuOpen}><PopoverTrigger asChild><Button variant="ghost" size="sm" className="book-menu" aria-label={`${bookLabel}, casebook menu`}><span className="wide-only">{bookLabel}</span><span className="narrow-only">{bookLabel.split(/[\s_]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()}</span><ChevronDown size={15}/></Button></PopoverTrigger><PopoverContent align="end" className="menu w-64 p-1.5" onClick={e=>{if((e.target as HTMLElement).closest('.menu-item'))setMenuOpen(false);}}>
    {books.length>1&&<>{books.map(b=><button key={b.id} className="menu-item" onClick={()=>openBook(b.id)}>{book?.id===b.id?<Check size={15}/>:<span className="w-[15px]"/>}<span className="truncate">{b.name}</span></button>)}<hr/></>}
    <button className="menu-item" onClick={()=>uploadRef.current?.click()}><Upload size={15}/>Import casebook</button>
    {book&&<button className="menu-item" onClick={()=>setKimaiView('connect')}><Clock size={15}/>{kimai?.connected?'Kimai':'Connect Kimai'}</button>}
+   <button className="menu-item" onClick={()=>setLimOpen(true)}><Paperclip size={15}/>Upload limits</button>
    {book&&<><hr/><button className="menu-item" onClick={()=>download('export')}><FileSpreadsheet size={15}/>Download Excel{unsaved>0&&<span className="muted"> · {plural(unsaved,'change')}</span>}</button><button className="menu-item" onClick={()=>download('bundle')}><FileArchive size={15}/>Download Excel + proof files</button><button className="menu-item" onClick={()=>download('original')}><FileDown size={15}/>Download the file you imported</button></>}
   </PopoverContent></Popover></div></header>
  <input ref={uploadRef} type="file" accept=".xlsx" className="hidden" onChange={e=>e.target.files?.[0]&&importBook(e.target.files[0])}/>
@@ -342,17 +365,18 @@ export default function Studio({displayName}:{displayName:string}){
  </>:null}
  </div></SidebarInset>
 
- <Dialog open={!!form} onOpenChange={open=>{if(!open)closeForm();}}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog" onOpenAutoFocus={e=>{if(matchMedia('(pointer:coarse)').matches){e.preventDefault();return;}const empty=[...document.querySelectorAll<HTMLInputElement>('.entry-dialog .form-rows [aria-required=true]')].find(x=>!x.disabled&&isEmpty(x)&&x.type!=='date'),el=empty??document.querySelector<HTMLElement>('.entry-dialog .form-rows textarea:not([disabled]), .entry-dialog .form-rows input:not([disabled]):not([type=date])');if(el){e.preventDefault();setTimeout(()=>el.focus(),0);}}} onEscapeKeyDown={e=>{if(menuEscape(e))return;if(confirmDiscard){e.preventDefault();setConfirmDiscard(false);return;}if(dirty()){e.preventDefault();setConfirmDiscard(true);}}}><DialogHeader><DialogTitle>{shown&&formTitle(shown)}</DialogTitle><DialogDescription className="sr-only">{values.A}</DialogDescription></DialogHeader>
+ <Dialog open={!!form} onOpenChange={open=>{if(!open)closeForm();}}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog" onOpenAutoFocus={e=>{if(matchMedia('(pointer:coarse)').matches){e.preventDefault();return;}const empty=[...document.querySelectorAll<HTMLInputElement>('.entry-dialog .form-rows [aria-required=true]')].find(x=>!x.disabled&&isEmpty(x)&&x.type!=='date'),el=empty??document.querySelector<HTMLElement>('.entry-dialog .form-rows textarea:not([disabled]), .entry-dialog .form-rows input:not([disabled]):not([type=date])');if(el){e.preventDefault();setTimeout(()=>el.focus(),0);}}} onEscapeKeyDown={e=>{if(menuEscape(e))return;if(conflict){e.preventDefault();setConflict(null);return;}if(confirmKimai){e.preventDefault();setConfirmKimai(false);return;}if(confirmDiscard){e.preventDefault();setConfirmDiscard(false);return;}if(dirty()){e.preventDefault();setConfirmDiscard(true);}}}><DialogHeader><DialogTitle>{shown&&formTitle(shown)}</DialogTitle><DialogDescription className="sr-only">{values.A}</DialogDescription></DialogHeader>
   <div className={'entry-scroll'+(dragging?' over':'')} onDragOver={e=>{if(form?.sheet!==CASES&&form?.sheet!==PORTFOLIO){e.preventDefault();setDragging(true);}}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);if(e.dataTransfer.files.length)uploadFiles(e.dataTransfer.files);}} onPaste={e=>{const files=[...e.clipboardData.files];if(files.length&&form?.sheet!==CASES&&form?.sheet!==PORTFOLIO){e.preventDefault();uploadFiles(files);}}}>
   {formError&&<div className="form-error" role="alert">{formError}</div>}
   {shown&&<><div className="form-rows">{layouts[shown.sheet].rows.map((row,i)=>{const cells=row.map(c=>field(c)).filter(Boolean);return cells.length?<div key={i} className={'form-row'+(row.includes('J')||shown.sheet===CASES&&row.includes('F')?' times':'')} style={{gridTemplateColumns:`repeat(${cells.length},minmax(0,1fr))`}}>{cells}</div>:null;})}</div>
   <details className="more" open={moreOpen} onToggle={e=>setMoreOpen((e.currentTarget as HTMLDetailsElement).open)}><summary>More <span className="muted">{moreSummary(shown.sheet)}</span></summary><div className="form-grid">{layouts[shown.sheet].more.map(c=>field(c))}</div></details></>}
   </div>
-  <div className="dialog-actions">{shown?.existing&&<ConfirmButton className="delete-btn" label={<><Trash2 size={15}/>Delete</>} confirmLabel={shown.sheet===SESSIONS&&kstatus?.linked?.includes(values.A)?'Delete here? Kimai keeps its entry':`Delete ${values.A}?`} onConfirm={deleteEntry} disabled={saving}/>}{confirmDiscard?<><span className="discard-q" role="alert">Discard your changes?</span><Button key="keep" variant="ghost" className="discard-keep" autoFocus onClick={()=>setConfirmDiscard(false)}>Keep editing</Button><Button key="discard" variant="outline" className="discard-yes" onClick={()=>setForm(null)}>Discard</Button></>:<>{kimaiNote&&!kimaiNote.startsWith('Adds')&&<span className="save-note">{kimaiNote}</span>}<Button key="cancel" variant="ghost" onClick={closeForm} disabled={saving}>Cancel</Button><Button key="save" className="primary-button" onClick={saveEntry} disabled={saving}>{saving?'Saving…':kimaiNote.startsWith('Adds')?`Save and add ${fmtH(values.L)} to Kimai`:shown?.sheet===SESSIONS&&shown.existing&&kimai?.connected&&kstatus?.linked?.includes(values.A)?'Save and update Kimai':'Save'}</Button></>}</div>
+  <div className="dialog-actions">{shown?.existing&&<ConfirmButton className="delete-btn" label={<><Trash2 size={15}/>Delete</>} confirmLabel={shown.sheet===SESSIONS&&kstatus?.linked?.includes(values.A)?'Delete here? Kimai keeps its entry':`Delete ${values.A}?`} onConfirm={deleteEntry} disabled={saving}/>}{conflict?<><span className="discard-q" role="alert">Changed in another window: {conflict.fields.join(', ')}.</span><Button key="theirs" variant="outline" onClick={()=>{setValues(conflict.theirs);setInitial(JSON.stringify(conflict.theirs));setConflict(null);setFormError('');}}>Use theirs</Button><Button key="mine" className="primary-button" autoFocus onClick={()=>{setConflict(null);saveEntry();}} disabled={saving}>Keep mine</Button></>:confirmKimai?<><span className="discard-q" role="alert">This also changes the entry in Kimai.</span><label className="check noask"><Checkbox checked={noAsk} onCheckedChange={v=>setNoAsk(v===true)}/>Don't ask again</label><Button key="back" variant="ghost" onClick={()=>setConfirmKimai(false)}>Back</Button><Button key="confirm" className="primary-button" autoFocus onClick={askThenSave} disabled={saving}>Save and update Kimai</Button></>:confirmDiscard?<><span className="discard-q" role="alert">Discard your changes?</span><Button key="keep" variant="ghost" className="discard-keep" autoFocus onClick={()=>setConfirmDiscard(false)}>Keep editing</Button><Button key="discard" variant="outline" className="discard-yes" onClick={()=>setForm(null)}>Discard</Button></>:<>{kimaiNote&&!kimaiNote.startsWith('Adds')&&<span className="save-note">{kimaiNote}</span>}<Button key="cancel" variant="ghost" onClick={closeForm} disabled={saving}>Cancel</Button><Button key="save" className="primary-button" onClick={askThenSave} disabled={saving}>{saving?'Saving…':kimaiNote.startsWith('Adds')?`Save and add ${fmtH(values.L)} to Kimai`:shown?.sheet===SESSIONS&&shown.existing&&kimai?.connected&&kstatus?.linked?.includes(values.A)?'Save and update Kimai':'Save'}</Button></>}</div>
  </DialogContent></Dialog>
 
  <Dialog open={!!portfolio} onOpenChange={open=>!open&&setPortfolio(null)}><DialogContent onCloseAutoFocus={returnFocus} className="portfolio-dialog" onEscapeKeyDown={menuEscape}><DialogHeader><DialogTitle>{portfolio?.values.D}</DialogTitle><DialogDescription>{portfolio?.values.J??'Pending Review'}</DialogDescription></DialogHeader><p className="portfolio-story">{portfolio?.values.M||'No story yet.'}</p>{portfolio?.values.I&&<p className="muted">{portfolio.values.I}</p>}<label className="confirm-label"><Checkbox checked={publicCheck} onCheckedChange={v=>setPublicCheck(v===true)}/><span>Reviewed and OK to share</span></label><Button className="primary-button" disabled={!publicCheck||portfolio?.values.G!=='Yes'||!portfolio?.values.M} title={portfolio?.values.G!=='Yes'?'Set Cleaned Up to Yes first':undefined} onClick={()=>{if(!portfolio)return;const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));const title=escape(portfolio.values.D),story=escape(portfolio.values.M),skills=escape(portfolio.values.I??''),state=escape(portfolio.values.J==='Approved'?'Approved project record':'Learning record · Pending Review');const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{font:18px/1.7 system-ui;color:#1b2a33;background:#f6f7f8;margin:0;padding:7vw}main{max-width:850px;margin:auto;background:white;padding:5vw;border-radius:10px}h1{font-size:2.5em;line-height:1.15}p{white-space:pre-wrap}.meta{font-size:14px;color:#5b6b75}</style><main><p class="meta">I/O Shield · Project portfolio</p><h1>${title}</h1><p class="meta">${state}</p><p>${story}</p><h2>Skills described</h2><p>${skills}</p></main></html>`;downloadBlob(new Blob([html],{type:'text/html'}),'portfolio-project.html');}}><Download size={15}/>Download page</Button></DialogContent></Dialog>
  {KimaiConnect()}
+ {LimitsDialog()}
  <Dialog open={helpOpen} onOpenChange={setHelpOpen}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog help-dialog" onEscapeKeyDown={menuEscape}><DialogHeader><DialogTitle>Help</DialogTitle><DialogDescription className="sr-only">Short clips showing how to use Casebook Studio</DialogDescription></DialogHeader><div className="help-tabs">{tutorials.map((t,i)=><button key={t.src} aria-pressed={i===helpClip} className={'chip'+(i===helpClip?' on':'')} onClick={()=>setHelpClip(i)}>{t.title}</button>)}</div><Clip key={tutorials[helpClip].src} src={tutorials[helpClip].src} label={tutorials[helpClip].steps}/><p className="sr-only">{tutorials[helpClip].steps}</p><p className="shortcuts"><span><kbd>L</kbd> Log session</span><span><kbd>N</kbd> New case</span><span><kbd>/</kbd> Search</span><span><kbd>?</kbd> Help</span><span>Click <Clock size={13} aria-label="the clock"/> on a case to log a session</span></p></DialogContent></Dialog>
  {KimaiReview()}
  </SidebarProvider>;
@@ -363,6 +387,17 @@ export default function Studio({displayName}:{displayName:string}){
   const st=kstatus,parts=st&&!st.offline?[st.new?.length&&`${st.new.length} new`,st.to_send?.length&&`${st.to_send.length} to send`,st.conflicts?.length&&<span className="warn-text">{st.conflicts.length} changed on both sides</span>,st.missing?.length&&`${st.missing.length} removed`].filter(Boolean):[];
   const ago=st?.synced?Math.max(0,Math.round((Date.now()-Date.parse(st.synced))/60000)):null;
   return <div className="kimai-bar" aria-live="polite"><Clock size={15}/><span>{!st||(ksyncing&&!st.synced)?<>Checking Kimai…</>:st.offline?<>{/reachable/.test(st.offline)?'Kimai offline':st.offline}</>:parts.length?<>Kimai · {parts.map((x:any,i:number)=><span key={i}>{i?' · ':''}{x}</span>)}</>:<>Kimai up to date</>}</span>{ago!==null&&<span className="muted">{ago<1?'just now':ago<60?`${ago} min ago`:`${Math.round(ago/60)} h ago`}</span>}<button className="icon-btn" aria-label="Sync with Kimai" title="Sync" onClick={()=>kimaiSync()} disabled={ksyncing}><RefreshCw size={14} className={ksyncing&&kstatus?'spin':''}/></button>{parts.length>0&&<button className="text-btn" onClick={()=>setKimaiView('review')}>Review</button>}{st?.offline&&<span className="muted" title={st.offline}>Using your last sync</span>}{st?.offline&&!/reachable/.test(st.offline)&&<button className="text-btn" onClick={()=>setKimaiView('connect')}>Connect again</button>}</div>;
+ }
+ // Proof upload limits. Totals count everything stored in a casebook, not one upload.
+ function LimitsDialog(){
+  const [draft,setDraft]=useState<any>(lim),[err,setErr]=useState(''),[busyL,setBusyL]=useState(false);
+  useEffect(()=>{if(limOpen){setDraft(lim);setErr('');}},[limOpen]);
+  async function saveLimits(){setBusyL(true);setErr('');try{const r=await send('settings/limits',draft,'PUT');setLim(r);setLimOpen(false);toast.success('Upload limits saved.');}catch(e){setErr((e as Error).message);}finally{setBusyL(false);}}
+  const row=(k:string,label:string,unit:string)=><Field key={k} label={label}><div className="hours-input"><Input type="number" min={1} max={lim.max?.[k]} value={draft[k]??''} onChange={e=>setDraft((d:any)=>({...d,[k]:e.target.value}))} aria-label={label}/><span className="muted" aria-hidden="true">{unit}</span></div></Field>;
+  return <Dialog open={limOpen} onOpenChange={setLimOpen}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog limits-dialog" onEscapeKeyDown={menuEscape}><DialogHeader><DialogTitle>Upload limits</DialogTitle><DialogDescription>Per casebook. Totals count every proof file stored, not one upload.</DialogDescription></DialogHeader>
+   {err&&<div className="form-error" role="alert">{err}</div>}
+   <div className="form-row" style={{gridTemplateColumns:'repeat(3,minmax(0,1fr))'}}>{row('fileMb','Largest file','MB')}{row('totalMb','All proof files','MB')}{row('files','Number of files','files')}</div>
+   <div className="dialog-actions"><Button variant="ghost" onClick={()=>setLimOpen(false)}>Cancel</Button><Button className="primary-button" onClick={saveLimits} disabled={busyL}>Save</Button></div></DialogContent></Dialog>;
  }
  function KimaiConnect(){
   const [url,setUrl]=useState(kimai?.url??'https://clock.ioshield.io'),[token,setToken]=useState(''),[busyK,setBusyK]=useState(false),[err,setErr]=useState('');
@@ -452,12 +487,13 @@ function ConfirmButton({label,confirmLabel,onConfirm,disabled,className='',varia
 function TipButton({label,tip}:{label:string,tip:string}){const [open,setOpenRaw]=useState(false),close=useRef(()=>setOpenRaw(false)).current,setOpen=(o:boolean)=>{setOpenRaw(o);trackMenu(o,close);};
  return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><button type="button" className="tip-btn" aria-label={`What ${label} means`}>?</button></PopoverTrigger><PopoverContent side="top" className="tip-pop">{tip}</PopoverContent></Popover>;}
 function Section({title,count,extra,add,addLabel,children}:{title:string,count:number,extra?:string,add:()=>void,addLabel:string,children:React.ReactNode}){return <section className="group"><div className="group-head"><h2>{title}</h2><span className="muted">{count||''}{extra&&count?` · ${extra}`:''}</span><button className="text-btn" onClick={add}><Plus size={14}/>{addLabel}</button></div>{count>0&&<div className="list">{children}</div>}</section>;}
-function Field({label,required=false,wide=false,group=false,children}:{label:string,required?:boolean,wide?:boolean,group?:boolean,children:React.ReactNode}){
+function Field({label,required=false,wide=false,group=false,error,children}:{label:string,required?:boolean,wide?:boolean,group?:boolean,error?:string,children:React.ReactNode}){
  // With a definition, the "?" button must sit outside the <label>, or its text joins the field's accessible name.
  // Every control passes its own aria-label, so a plain wrapper is fine then.
- const tip=fieldTips[label],Tag=group||tip?'div':'label',ref=useRef<HTMLElement>(null);
+ const tip=fieldTips[label],Tag=group||tip?'div':'label',ref=useRef<HTMLElement>(null),errId=useId();
+ useEffect(()=>{ref.current?.querySelectorAll<HTMLElement>('input,textarea,[role=combobox]').forEach(el=>{if(error){el.setAttribute('aria-describedby',errId);el.setAttribute('aria-invalid','true');}else if(el.getAttribute('aria-describedby')===errId)el.removeAttribute('aria-describedby');});},[error]);
  // Controls carry their own aria-label, so mark them required directly for screen readers.
  useEffect(()=>{if(!required)return;ref.current?.querySelectorAll<HTMLInputElement>('input,textarea,[role=combobox]').forEach(el=>{el.setAttribute('aria-required','true');if(!isEmpty(el))el.removeAttribute('aria-invalid');});});
  const text=<>{label}{required&&<><b aria-hidden="true"> *</b><span className="sr-only"> (required)</span></>}</>;
- return <Tag ref={ref as any} className={'field '+(wide?'wide':'')}>{tip?<span className="field-label"><span>{text}</span><TipButton label={label} tip={tip}/></span>:<span>{text}</span>}{children}</Tag>;
+ return <Tag ref={ref as any} className={'field '+(wide?'wide':'')}>{tip?<span className="field-label"><span>{text}</span><TipButton label={label} tip={tip}/></span>:<span>{text}</span>}{children}{error&&<span id={errId} className="field-error">{error}</span>}</Tag>;
 }

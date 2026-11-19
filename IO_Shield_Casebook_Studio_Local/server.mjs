@@ -6576,7 +6576,9 @@ var env = { DB: { prepare: prepared, async batch(statements) {
     database.exec("ROLLBACK");
     throw e;
   }
-} }, BUCKET: { async put(key, bytes) {
+} }, BUCKET: { async delete(key) {
+  fs.rmSync(objectPath(key), { force: true });
+}, async put(key, bytes) {
   const filename = objectPath(key);
   fs.mkdirSync(path.dirname(filename), { recursive: true });
   const temp = filename + "." + crypto.randomUUID() + ".tmp";
@@ -8021,6 +8023,13 @@ async function deleteEntry(b, owner, sheet, row, source) {
 }
 var SESSIONS = "Session Ledger";
 var WINDOW_DAYS = 120;
+var LIMIT_DEFAULTS = { fileMb: 10, totalMb: 40, files: 100 };
+var LIMIT_MAX = { fileMb: 200, totalMb: 5e3, files: 2e3 };
+async function limits2() {
+  const out = {};
+  for (const k of Object.keys(LIMIT_DEFAULTS)) out[k] = +(await setting("limit_" + k) ?? LIMIT_DEFAULTS[k]);
+  return out;
+}
 async function setting(key) {
   return (await db().prepare("SELECT value FROM app_settings WHERE key=?").bind(key).first())?.value;
 }
@@ -8285,6 +8294,26 @@ async function handle(request) {
     }
     const kimaiResponse = await kimaiRoute(path3, method, request, owner);
     if (kimaiResponse) return kimaiResponse;
+    if (path3[0] === "settings" && path3[1] === "timer") {
+      if (method === "PUT") {
+        const body = await request.json();
+        if (body.start && isNaN(Date.parse(body.start))) throw Error("Invalid start time.");
+        await setSetting("timer_start", body.start || null);
+        await setSetting("timer_case", body.start && body.case ? String(body.case) : null);
+      }
+      return json({ start: await setting("timer_start") ?? null, case: await setting("timer_case") ?? null });
+    }
+    if (path3[0] === "settings" && path3[1] === "limits") {
+      if (method === "PUT") {
+        const body = await request.json();
+        for (const k of Object.keys(LIMIT_DEFAULTS)) {
+          const v = Math.round(+body[k]);
+          if (!(v >= 1 && v <= LIMIT_MAX[k])) throw Error(`Enter a number from 1 to ${LIMIT_MAX[k]}.`);
+          await setSetting("limit_" + k, String(v));
+        }
+      }
+      return json({ ...await limits2(), max: LIMIT_MAX });
+    }
     if (path3[0] === "books" && !path3[1]) {
       if (method === "GET") {
         const r = await db().prepare("SELECT id,name,revision,created,updated FROM casebooks WHERE owner=? ORDER BY updated DESC").bind(owner).all();
@@ -8340,17 +8369,31 @@ async function handle(request) {
       if (body.sheet === "Session Ledger" && r.before.A) await db().prepare("DELETE FROM kimai_links WHERE book_id=? AND session_id=?").bind(b.id, r.before.A).run();
       return json(r);
     }
-    if (path3[2] === "files" && method === "POST") {
+    if (path3[2] === "files" && !path3[3] && method === "POST") {
       const totals = await db().prepare("SELECT SUM(bytes) AS bytes,COUNT(*) AS n FROM proof_files WHERE book_id=?").bind(b.id).first(), form = await request.formData(), f = form.get("file");
       if (!(f instanceof File)) throw Error("Choose a file.");
       if (!/\.(pdf|png|jpg|jpeg|webp|txt|md|csv|json|log|pcap|pcapng|conf|yaml|yml|docx|xlsx)$/i.test(f.name)) throw Error(`${f.name} can't be attached. Use a PDF, image, text, log, config, Word, Excel or packet capture file.`);
+      const lim = await limits2();
       if (f.size <= 0) throw Error(`${f.name} is empty.`);
-      if (f.size > 10 * 1024 * 1024) throw Error(`${f.name} is over 10 MB.`);
-      if ((totals.bytes ?? 0) + f.size > 40 * 1024 * 1024 || totals.n >= 100) throw Error("A casebook can hold up to 100 proof files (40 MB in all).");
+      if (f.size > lim.fileMb * 1024 * 1024) throw Error(`${f.name} is over ${lim.fileMb} MB.`);
+      if ((totals.bytes ?? 0) + f.size > lim.totalMb * 1024 * 1024 || totals.n >= lim.files) throw Error(`This casebook already holds its limit of proof files (${lim.files} files, ${lim.totalMb} MB in all). You can raise it under Upload limits.`);
       const bytes = await f.arrayBuffer(), hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map((n) => n.toString(16).padStart(2, "0")).join(""), id = crypto.randomUUID(), name = safeName(f.name), key = owner + "/" + b.id + "/proof/" + id, created = now();
       await bucket().put(key, bytes);
       await db().prepare("INSERT INTO proof_files (id,book_id,owner,name,object_key,hash,bytes,created) VALUES (?,?,?,?,?,?,?,?)").bind(id, b.id, owner, name, key, hash, f.size, created).run();
       return json({ id, name, hash, bytes: f.size, created, ref: `attachments/${id}/${name}` }, 201);
+    }
+    if (path3[2] === "files" && path3[3] === "forget" && method === "POST") {
+      const body = await request.json(), proofRows = rowsFor(JSON.parse(b.parsed), JSON.parse(b.edits), "Evidence Index");
+      let removed = 0;
+      for (const id of (body.ids ?? []).map(String).slice(0, 50)) {
+        if (proofRows.some((r) => (r.values.F ?? "").includes(id))) continue;
+        const f = await db().prepare("SELECT object_key FROM proof_files WHERE id=? AND book_id=?").bind(id, b.id).first();
+        if (!f) continue;
+        await bucket().delete(f.object_key);
+        await db().prepare("DELETE FROM proof_files WHERE id=? AND book_id=?").bind(id, b.id).run();
+        removed++;
+      }
+      return json({ removed });
     }
     if (path3[2] === "history" && method === "GET") {
       const r = await db().prepare("SELECT revision,detail,created FROM casebook_events WHERE book_id=? ORDER BY revision DESC LIMIT 100").bind(b.id).all();
@@ -8419,9 +8462,9 @@ async function respond(req, res) {
       const chunks = [];
       for await (const chunk of req) {
         size2 += chunk.length;
-        if (size2 > 40 * 1024 * 1024) {
+        if (size2 > 210 * 1024 * 1024) {
           res.writeHead(413, security);
-          return res.end("Upload exceeds 40 MB request limit.");
+          return res.end("That file is over 200 MB.");
         }
         chunks.push(chunk);
       }
