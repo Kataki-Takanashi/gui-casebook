@@ -8356,16 +8356,23 @@ async function handle(request) {
       if (+(request.headers.get("content-length") ?? 0) > 1e5) throw Error("Entry is too large.");
       const body = await request.json();
       if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. It is up to date now, so check the form and save again." }, 409);
-      const { sheet, row, values } = body;
+      const { sheet, values } = body;
+      let row = body.row;
       if (!values || typeof values !== "object") throw Error("Entry fields are missing.");
-      const saved = await saveEntry(b, owner, sheet, row, values, body.source === "restore" ? "restore" : void 0);
+      if (row === "new") {
+        const used = new Set(rowsFor(data, edits, sheet).map((r) => r.row));
+        row = 5;
+        while (used.has(row)) row++;
+      }
+      const fromScript = request.headers.get("x-casebook-source") === "script";
+      const saved = await saveEntry(b, owner, sheet, row, values, body.source === "restore" ? "restore" : fromScript ? "api" : void 0);
       const kimai = sheet === "Session Ledger" ? await afterSessionSave(b, values.A, !!body.kimai, body.kimai?.activity ? { project: +body.kimai.project, activity: +body.kimai.activity } : void 0) : void 0;
       return json({ ...saved, kimai });
     }
     if (path3[2] === "entries" && path3[3] === "delete" && method === "POST") {
       const body = await request.json();
       if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload the page, then try again." }, 409);
-      const r = await deleteEntry(b, owner, body.sheet, +body.row);
+      const r = await deleteEntry(b, owner, body.sheet, +body.row, request.headers.get("x-casebook-source") === "script" ? "api" : void 0);
       if (body.sheet === "Session Ledger" && r.before.A) await db().prepare("DELETE FROM kimai_links WHERE book_id=? AND session_id=?").bind(b.id, r.before.A).run();
       return json(r);
     }
@@ -8394,6 +8401,11 @@ async function handle(request) {
         removed++;
       }
       return json({ removed });
+    }
+    if (path3[2] === "records" && path3[3] && method === "GET") {
+      const sheet = decodeURIComponent(path3[3]);
+      if (!data.sheets[sheet]) throw Error("Unknown sheet.");
+      return json({ sheet, revision: b.revision, records: rowsFor(data, edits, sheet) });
     }
     if (path3[2] === "history" && method === "GET") {
       const r = await db().prepare("SELECT revision,detail,created FROM casebook_events WHERE book_id=? ORDER BY revision DESC LIMIT 100").bind(b.id).all();

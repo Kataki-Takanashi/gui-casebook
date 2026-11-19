@@ -227,14 +227,17 @@ async function handle(request:Request){try{
  if(path[2]==='original'&&method==='GET'){const o=await bucket().get(b.original_key);if(!o)throw Error('Original unavailable.');return new Response(o.body,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="${safeName(b.name)}"`,'Cache-Control':'no-store'}});}
  if(path[2]==='entries'&&method==='PUT'){
   if(+(request.headers.get('content-length')??0)>100000)throw Error('Entry is too large.');const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. It is up to date now, so check the form and save again.'},409);
-  const {sheet,row,values}=body;if(!values||typeof values!=='object')throw Error('Entry fields are missing.');
-  const saved=await saveEntry(b,owner,sheet,row,values,body.source==='restore'?'restore':undefined);
+  const {sheet,values}=body;let row=body.row;if(!values||typeof values!=='object')throw Error('Entry fields are missing.');
+  // Scripts may pass row:"new" to use the first free row.
+  if(row==='new'){const used=new Set(rowsFor(data,edits,sheet).map((r:any)=>r.row));row=5;while(used.has(row))row++;}
+  const fromScript=request.headers.get('x-casebook-source')==='script';
+  const saved=await saveEntry(b,owner,sheet,row,values,body.source==='restore'?'restore':fromScript?'api':undefined);
   const kimai=sheet==='Session Ledger'?await afterSessionSave(b,values.A,!!body.kimai,body.kimai?.activity?{project:+body.kimai.project,activity:+body.kimai.activity}:undefined):undefined;
   return json({...saved,kimai});
  }
  if(path[2]==='entries'&&path[3]==='delete'&&method==='POST'){
   const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload the page, then try again.'},409);
-  const r=await deleteEntry(b,owner,body.sheet,+body.row);
+  const r=await deleteEntry(b,owner,body.sheet,+body.row,request.headers.get('x-casebook-source')==='script'?'api':undefined);
   if(body.sheet==='Session Ledger'&&r.before.A)await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,r.before.A).run();
   return json(r);
  }
@@ -249,6 +252,8 @@ async function handle(request:Request){try{
  if(path[2]==='files'&&path[3]==='forget'&&method==='POST'){const body:any=await request.json(),proofRows=rowsFor(JSON.parse(b.parsed),JSON.parse(b.edits),'Evidence Index');let removed=0;
   for(const id of (body.ids??[]).map(String).slice(0,50)){if(proofRows.some((r:any)=>(r.values.F??'').includes(id)))continue;const f=await db().prepare('SELECT object_key FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).first();if(!f)continue;await bucket().delete(f.object_key);await db().prepare('DELETE FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).run();removed++;}
   return json({removed});}
+ // Read one sheet's records with app edits applied, for scripts.
+ if(path[2]==='records'&&path[3]&&method==='GET'){const sheet=decodeURIComponent(path[3]);if(!data.sheets[sheet])throw Error('Unknown sheet.');return json({sheet,revision:b.revision,records:rowsFor(data,edits,sheet)});}
  if(path[2]==='history'&&method==='GET'){const r=await db().prepare('SELECT revision,detail,created FROM casebook_events WHERE book_id=? ORDER BY revision DESC LIMIT 100').bind(b.id).all();return json(r.results);}
  if((path[2]==='export'||path[2]==='bundle')&&method==='GET'){
   const o=await bucket().get(b.original_key);if(!o)throw Error('The original workbook is unavailable.');const bytes=exportWorkbook(new Uint8Array(await o.arrayBuffer()),edits),filename=b.name.replace(/\.xlsx$/i,'')+`_revision_${b.revision}.xlsx`;

@@ -31,5 +31,9 @@ try{
  const session={A:'LOCAL-TEST-001-S001',B:'2026-10-02',C:'LOCAL-TEST-001',D:'Session test',E:'Practical',F:'Training',G:'01',I:'T1',J:'18:00',K:'19:00',L:'1',P:'1'};
  for(const bad of [{L:'0x10'},{L:'1e1'},{B:'0001-01-01'},{J:'banana'},{K:'25:99'}]){r=await get(`/api/books/${id}/entries`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet:'Session Ledger',row:5,revision:1,values:{...session,...bad}})});assert.equal(r.status,400,JSON.stringify(bad));}
  r=await get(`/api/books/${id}/entries`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet:'Session Ledger',row:5,revision:1,values:session})});assert.equal(r.status,200,await r.clone().text());
- console.log(JSON.stringify({passed:true,mode:'standalone localhost',checks:15,sheets:23,restartPersistence:true,proofStoredOnDisk:true,externalOriginsRejected:true}));
+ // Scripts: row "new", the source tag in History, and the records read.
+ r=await get(`/api/books/${id}/entries`,{method:'PUT',headers:{'Content-Type':'application/json','X-Casebook-Source':'script'},body:JSON.stringify({sheet:'Session Ledger',row:'new',revision:2,values:{...session,A:'LOCAL-TEST-001-S002'}})});assert.equal(r.status,200,await r.clone().text());
+ r=await get(`/api/books/${id}/records/${encodeURIComponent('Session Ledger')}`);const rec=await r.json();assert.equal(rec.records.filter(x=>x.values.C==='LOCAL-TEST-001').length,2);
+ r=await get(`/api/books/${id}/history`);assert.equal(JSON.parse((await r.json())[0].detail).source,'api');
+ console.log(JSON.stringify({passed:true,mode:'standalone localhost',checks:16,sheets:23,restartPersistence:true,proofStoredOnDisk:true,externalOriginsRejected:true}));
 }finally{if(child&&child.exitCode===null)await stop();fs.rmSync(temp,{recursive:true,force:true});}
