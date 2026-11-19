@@ -23,10 +23,16 @@ automatically when there is no runtime folder.
 USING YOUR CASEBOOK
 - Drop your casebook .xlsx on the start page, or use the casebook menu
   (top right) > Import casebook.
+- No casebook yet? Ask Will for the Field School casebook .xlsx.
+- Casebook in Google Sheets? File > Download > Microsoft Excel (.xlsx), then
+  import that file.
 - Import occurs locally. The original workbook is retained untouched.
 - Open a case to log sessions, add proof, claim skills, and write portfolio
   stories. IDs, hours, and fields from the case are filled in for you.
-- Casebook menu > Download Excel saves an updated revision.
+- Your .xlsx is not changed while you work. Casebook menu > Download Excel
+  saves the updated file; the menu shows how many changes are not downloaded.
+- Kimai: casebook menu > Kimai. You need a Kimai API token (Help > Get a
+  Kimai API token).
 - Download Excel + proof saves a ZIP with the workbook, uploaded supporting
   files, and revision history. Extract the complete bundle together.
 - Open exported Excel files in Excel or LibreOffice to recalculate formulas.
@@ -46,14 +52,11 @@ To migrate, install/extract this app on the other computer and place that
 data folder beside server.mjs before launching. Excel + proof exports provide
 portable document copies; the data folder is the complete workspace backup.
 For an app upgrade, preserve data and replace only the application files.
-The app does not sync with the hosted pilot. To transfer records from there,
-export an updated workbook and upload it here. Proof files must be downloaded
-and reattached locally; cross-app attachment mappings do not migrate yet.
 
 LOCAL OPERATION
 The server listens only on 127.0.0.1. Other computers cannot connect.
 No login is required: this is a personal application for the current computer.
-It makes no outbound network requests. Use your normal OS account permissions,
+It only connects out to Kimai, and only if you connect it. Use your normal OS account permissions,
 disk encryption, and backup controls for access to the data folder.
 Do not expose this version to the internet or treat it as a multi-user server.
 

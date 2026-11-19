@@ -22,7 +22,8 @@ export function validateEntry(data:BookData,edits:Edits,sheet:string,row:number,
  if(!editable[sheet]||!data.sheets[sheet])throw Error('Unsupported sheet.');
  if(!Number.isInteger(row)||row<5||row>data.sheets[sheet].capacity)throw Error('This sheet has reached its supported template capacity.');
  for(const [k,v]of Object.entries(values))if(!editable[sheet].includes(k)||typeof v!=='string'||v.length>32000)throw Error('An entry field is invalid.');
- for(const col of required[sheet])if(!values[col]?.trim())throw Error(`Complete ${data.sheets[sheet].headers[col]}.`);
+ const missing=required[sheet].filter(col=>!values[col]?.trim()).map(col=>data.sheets[sheet].headers[col]);
+ if(missing.length)throw Error(`Complete ${missing.length>1?missing.slice(0,-1).join(', ')+' and '+missing.at(-1):missing[0]}.`);
  const current=rowsFor(data,edits,sheet).find(r=>r.row===row);
  if(current&&current.values.A!==values.A)throw Error('Record IDs cannot be changed.');
  if(rowsFor(data,edits,sheet).some(r=>r.row!==row&&r.values.A===values.A))throw Error('That ID is already used. Choose another.');
@@ -33,6 +34,7 @@ export function validateEntry(data:BookData,edits:Edits,sheet:string,row:number,
  if(sheet==='Session Ledger'){
   if(!Object.keys(timeNames).includes(values.I))throw Error('Choose a time class.');
   if(['T4','T5'].includes(values.I)&&values.L)throw Error('Leave hours blank for T4 and T5.');
+  if(['T1','T2','T3'].includes(values.I)&&!values.L?.trim())throw Error('Enter start and end times, or hours.');
   if(['T1','T2','T3'].includes(values.I)&&(!/^\d{0,2}(\.\d+)?$/.test(values.L?.trim()??'')||+values.L<=0||+values.L>24))throw Error('Enter hours above 0, up to 24.');
   for(const col of ['J','K'])if(values[col]&&!clockTime(values[col]))throw Error(`Enter a valid ${col==='J'?'start':'end'} time.`);
   if(!/^[0-5]$/.test(values.P))throw Error('Choose a work level.');

@@ -7642,7 +7642,8 @@ function validateEntry(data, edits, sheet, row, values) {
   if (!editable[sheet] || !data.sheets[sheet]) throw Error("Unsupported sheet.");
   if (!Number.isInteger(row) || row < 5 || row > data.sheets[sheet].capacity) throw Error("This sheet has reached its supported template capacity.");
   for (const [k, v] of Object.entries(values)) if (!editable[sheet].includes(k) || typeof v !== "string" || v.length > 32e3) throw Error("An entry field is invalid.");
-  for (const col of required[sheet]) if (!values[col]?.trim()) throw Error(`Complete ${data.sheets[sheet].headers[col]}.`);
+  const missing = required[sheet].filter((col) => !values[col]?.trim()).map((col) => data.sheets[sheet].headers[col]);
+  if (missing.length) throw Error(`Complete ${missing.length > 1 ? missing.slice(0, -1).join(", ") + " and " + missing.at(-1) : missing[0]}.`);
   const current = rowsFor(data, edits, sheet).find((r) => r.row === row);
   if (current && current.values.A !== values.A) throw Error("Record IDs cannot be changed.");
   if (rowsFor(data, edits, sheet).some((r) => r.row !== row && r.values.A === values.A)) throw Error("That ID is already used. Choose another.");
@@ -7653,6 +7654,7 @@ function validateEntry(data, edits, sheet, row, values) {
   if (sheet === "Session Ledger") {
     if (!Object.keys(timeNames).includes(values.I)) throw Error("Choose a time class.");
     if (["T4", "T5"].includes(values.I) && values.L) throw Error("Leave hours blank for T4 and T5.");
+    if (["T1", "T2", "T3"].includes(values.I) && !values.L?.trim()) throw Error("Enter start and end times, or hours.");
     if (["T1", "T2", "T3"].includes(values.I) && (!/^\d{0,2}(\.\d+)?$/.test(values.L?.trim() ?? "") || +values.L <= 0 || +values.L > 24)) throw Error("Enter hours above 0, up to 24.");
     for (const col of ["J", "K"]) if (values[col] && !clockTime(values[col])) throw Error(`Enter a valid ${col === "J" ? "start" : "end"} time.`);
     if (!/^[0-5]$/.test(values.P)) throw Error("Choose a work level.");
@@ -7701,11 +7703,17 @@ var text = (e) => e?.textContent ?? "";
 function unpack(bytes) {
   if (bytes.length > 30 * 1024 * 1024) throw Error("Casebooks must be smaller than 30 MB.");
   let expanded = 0;
-  const files = unzipSync(bytes, { filter: (f) => {
-    expanded += f.originalSize;
-    if (expanded > 120 * 1024 * 1024) throw Error("This casebook is too large to open.");
-    return true;
-  } });
+  let files;
+  try {
+    files = unzipSync(bytes, { filter: (f) => {
+      expanded += f.originalSize;
+      if (expanded > 120 * 1024 * 1024) throw Error("This casebook is too large to open.");
+      return true;
+    } });
+  } catch (e) {
+    if (/too large/.test(e.message)) throw e;
+    throw Error("This is not a usable .xlsx workbook. If it has a password, remove it in Excel and import again.");
+  }
   if (!files["xl/workbook.xml"] || !files["xl/_rels/workbook.xml.rels"]) throw Error("This is not a usable .xlsx workbook. If it has a password, remove it in Excel and import again.");
   return files;
 }
@@ -7761,7 +7769,7 @@ function parseWorkbook(bytes) {
     sheets[name] = { path: path3, headers, rows, capacity: limits[name] ?? 1e4, lists: validationLists(doc) };
   }
   const expected = { "Case Register": { A: "Case ID", C: "Case / Project", N: "Time Class", X: "What I Did" }, "Session Ledger": { A: "Session ID", C: "Case ID", I: "Time Class", L: "Hours Entered" }, "Evidence Index": { A: "Proof ID", B: "Case ID", F: "File / Link" }, "Competency Evidence": { A: "Demo ID", B: "Case ID", E: "Skill ID", N: "Review Status" }, "Portfolio": { A: "Item ID", B: "Case ID", D: "Title", J: "Approval" }, "Competency Catalog": { A: "Skill ID", C: "Skill" }, "Domain Framework": { A: "ID", C: "Practice Domain" } };
-  for (const [s, cols] of Object.entries(expected)) for (const [col, label] of Object.entries(cols)) if (sheets[s]?.headers[col] !== label) throw Error(`This workbook does not match the supported Casebook v3 layout: ${s}, ${label}.`);
+  for (const [s, cols] of Object.entries(expected)) for (const [col, label] of Object.entries(cols)) if (sheets[s]?.headers[col] !== label) throw Error(`This isn't the Field School casebook layout (${s} is missing "${label}"). Import your casebook .xlsx.`);
   return { sheets, profile, sheetNames: Object.keys(sheets) };
 }
 function exportWorkbook(original, edits) {

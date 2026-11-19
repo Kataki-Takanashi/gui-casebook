@@ -183,7 +183,7 @@ export default function Studio({displayName}:{displayName:string}){
  const moreSummary=(sheet:string)=>{const skip=new Set(['A',...longCols(sheet)]);return layouts[sheet].more.filter(c=>!skip.has(c)&&values[c]&&values[c]!=='No').map(c=>{const v=values[c],l=labelFor(sheet,c);return l==='Work Level'?levels[+v]?.slice(4):l.includes('Domain')?domainLabel(v).replace(/^\d+ · /,''):v;}).filter(Boolean).slice(0,4).join(' · ');};
  const longCols=(sheet:string)=>(editable[sheet]??[]).filter(c=>longFields.includes(labelFor(sheet,c)));
  function withParent(next:Record<string,string>,parentId:string){const p=findCase(parentId);next.B=p?.values.A??'';next.A=nextCaseId(cases.map(r=>r.values.A),p?.values.A??'',new Date().getFullYear());if(p)Object.assign(next,{D:next.D==='Training Case'?'Project Case':next.D,E:p.values.E||next.E,H:domainCode(p.values.H??'')||next.H,I:domainCode(p.values.I??'')||next.I,J:p.values.J||next.J});return next;}
- function change(col:string,v:string){setValues(old=>{
+ function change(col:string,v:string){setFormError('');setValues(old=>{
   if(!form)return old;const sheet=form.sheet;let next={...old,[col]:v};
   if(!form.existing&&col===caseCol(sheet)&&sheet!==CASES){next=inferFromCase(sheet,v,next);}
   if(sheet===CASES&&col==='B'&&!form.existing)next=withParent(next,v);
@@ -254,7 +254,11 @@ export default function Studio({displayName}:{displayName:string}){
    toast(`Deleted ${r.before.A}.`,{action:{label:'Undo',onClick:async()=>{try{const cur=await api('books/'+book.id);const back=await put(cur.revision,f.sheet,f.row,Object.fromEntries(editable[f.sheet].map(c=>[c,r.before[c]??''])),{source:'restore'});setBook(b=>b&&{...b,revision:back.revision,edits:back.edits,updated:back.updated});toast.success(`Restored ${r.before.A}.`);}catch(e){toast.error((e as Error).message);}}},duration:10000});
   }catch(e){setFormError((e as Error).message);}finally{setSaving(false);}
  }
- async function download(kind:string){if(!book)return;setBusy(true);setErrorRetry(()=>()=>download(kind));try{const r=await fetch(`/api/books/${book.id}/${kind}`);if(!r.ok)throw Error((await r.json() as any).error??'Download failed.');const name=/filename="([^"]+)"/.exec(r.headers.get('content-disposition')??'')?.[1]??'casebook.xlsx';downloadBlob(await r.blob(),name);setErrorRetry(null);}catch(e){setError(`Download failed: ${(e as Error).message}`);}finally{setBusy(false);}}
+ // How many saves since the last Excel download, so it's clear the .xlsx on disk is behind.
+ const [exportedRev,setExportedRev]=useState<number|null>(null);
+ useEffect(()=>{if(!book)return;try{setExportedRev(+(localStorage.getItem('exported:'+book.id)??0));}catch{setExportedRev(0);}},[book?.id]);
+ const unsaved=book&&exportedRev!==null?Math.max(0,book.revision-exportedRev):0;
+ async function download(kind:string){if(!book)return;setBusy(true);setErrorRetry(()=>()=>download(kind));try{const r=await fetch(`/api/books/${book.id}/${kind}`);if(!r.ok)throw Error((await r.json() as any).error??'Download failed.');const name=/filename="([^"]+)"/.exec(r.headers.get('content-disposition')??'')?.[1]??'casebook.xlsx';downloadBlob(await r.blob(),name);setErrorRetry(null);if(kind!=='original'){setExportedRev(book.revision);try{localStorage.setItem('exported:'+book.id,String(book.revision));}catch{}}}catch(e){setError(`Download failed: ${(e as Error).message}`);}finally{setBusy(false);}}
 
  function field(col:string){
   const form=shown;if(!book||!form)return null;const sheet=form.sheet,label=labelFor(sheet,col),value=values[col]??'',set=(v:string)=>change(col,v),req=required[sheet].includes(col),wide=longFields.includes(label)||sheet===PORTFOLIO&&col==='M';
@@ -304,14 +308,14 @@ export default function Studio({displayName}:{displayName:string}){
   <Popover open={menuOpen} onOpenChange={setMenuOpen}><PopoverTrigger asChild><Button variant="ghost" size="sm" className="book-menu" aria-label={`${bookLabel}, casebook menu`}><span className="wide-only">{bookLabel}</span><span className="narrow-only">{bookLabel.split(/[\s_]+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()}</span><ChevronDown size={15}/></Button></PopoverTrigger><PopoverContent align="end" className="menu w-64 p-1.5" onClick={e=>{if((e.target as HTMLElement).closest('.menu-item'))setMenuOpen(false);}}>
    {books.length>1&&<>{books.map(b=><button key={b.id} className="menu-item" onClick={()=>openBook(b.id)}>{book?.id===b.id?<Check size={15}/>:<span className="w-[15px]"/>}<span className="truncate">{b.name}</span></button>)}<hr/></>}
    <button className="menu-item" onClick={()=>uploadRef.current?.click()}><Upload size={15}/>Import casebook</button>
-   {book&&<button className="menu-item" onClick={()=>setKimaiView('connect')}><Clock size={15}/>Kimai</button>}
-   {book&&<><hr/><button className="menu-item" onClick={()=>download('export')}><FileSpreadsheet size={15}/>Download Excel</button><button className="menu-item" onClick={()=>download('bundle')}><FileArchive size={15}/>Download Excel + proof files</button><button className="menu-item" onClick={()=>download('original')}><FileDown size={15}/>Download the file you imported</button></>}
+   {book&&<button className="menu-item" onClick={()=>setKimaiView('connect')}><Clock size={15}/>{kimai?.connected?'Kimai':'Connect Kimai'}</button>}
+   {book&&<><hr/><button className="menu-item" onClick={()=>download('export')}><FileSpreadsheet size={15}/>Download Excel{unsaved>0&&<span className="muted"> · {plural(unsaved,'change')}</span>}</button><button className="menu-item" onClick={()=>download('bundle')}><FileArchive size={15}/>Download Excel + proof files</button><button className="menu-item" onClick={()=>download('original')}><FileDown size={15}/>Download the file you imported</button></>}
   </PopoverContent></Popover></div></header>
  <input ref={uploadRef} type="file" accept=".xlsx" className="hidden" onChange={e=>e.target.files?.[0]&&importBook(e.target.files[0])}/>
  <input ref={fileRef} type="file" multiple className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md,.csv,.json,.log,.pcap,.pcapng,.conf,.yaml,.yml,.docx,.xlsx" onChange={e=>e.target.files?.length&&uploadFiles(e.target.files)}/>
  <div className="workspace">
  {error&&<div role="alert" className="error-banner">{error}<Button variant="ghost" size="sm" onClick={()=>{const again=errorRetry;setError('');setErrorRetry(null);again?.();}}>{errorRetry?'Try again':'Dismiss'}</Button></div>}
- {!book?<section className={'import'+(dragging?' over':'')} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);const f=e.dataTransfer.files[0];if(f&&!busy)importBook(f);}}><h1>Import your casebook</h1><p>Drop your casebook .xlsx here.</p><Button className="primary-button" disabled={busy||!loaded} onClick={()=>uploadRef.current?.click()}><Upload size={16}/>{busy?'Importing…':'Choose file'}</Button></section>:
+ {!book?<section className={'import'+(dragging?' over':'')} onDragOver={e=>{e.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={e=>{e.preventDefault();setDragging(false);const f=e.dataTransfer.files[0];if(f&&!busy)importBook(f);}}><h1>Import your casebook</h1><p>Drop your Field School casebook (.xlsx) here. No casebook yet? Ask Will for it.</p><Button className="primary-button" disabled={busy||!loaded} onClick={()=>uploadRef.current?.click()}><Upload size={16}/>{busy?'Importing…':'Choose file'}</Button></section>:
  view==='cases'?<>
   <div className="heading"><h1>Cases</h1><div className="heading-actions"><div className="search"><Search size={15}/><Input placeholder="Search" aria-label="Search cases" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={searchKeys}/></div><Button variant="outline" title="New case (N)" onClick={()=>start(CASES)}><Plus size={15}/>New case</Button></div></div>
   <p className="summary-line"><span>{plural(cases.filter(r=>!isParent(r)).length,'case')}</span><span title={defs.time.T1?.[1]??'Exact time record exists.'}><b className="num">{fmtH(tracked)}</b> tracked (T1)</span><span title="Hours rebuilt from records (T2) or proven minimum (T3). Kept separate from tracked."><b className="num">{fmtH(rebuilt)}</b> rebuilt (T2, T3)</span><span>{plural(claims.length,'skill claim')}</span></p>
@@ -361,7 +365,7 @@ export default function Studio({displayName}:{displayName:string}){
   async function connect(){setBusyK(true);setErr('');try{const k=await send('kimai',{url,token},'PUT');setKimai(k);toast.success(`Connected to Kimai as ${k.user}.`);}catch(e){setErr((e as Error).message);}finally{setBusyK(false);}}
   async function disconnect(){try{const k=await send('kimai/disconnect',{});setKimai({...kimai!,...k,user:null});setKstatus(null);}catch(e){toast.error((e as Error).message);}}
   const mapped=cases.filter(r=>!isParent(r));
-  return <Dialog open={kimaiView==='connect'} onOpenChange={o=>!o&&setKimaiView('')}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog" onOpenAutoFocus={e=>e.preventDefault()} onEscapeKeyDown={menuEscape}><DialogHeader><DialogTitle>Kimai</DialogTitle><DialogDescription>{kimai?.connected?`Connected as ${kimai.user}`:'Not connected'}</DialogDescription></DialogHeader><div className="entry-scroll">
+  return <Dialog open={kimaiView==='connect'} onOpenChange={o=>!o&&setKimaiView('')}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog" onOpenAutoFocus={e=>e.preventDefault()} onEscapeKeyDown={menuEscape}><DialogHeader><DialogTitle>Kimai</DialogTitle><DialogDescription>{kimai?.connected?`Connected as ${kimai.user}`:'Not connected. Connecting lets you import Kimai entries as sessions and add sessions to Kimai.'}</DialogDescription></DialogHeader><div className="entry-scroll">
    {err&&<div className="form-error" role="alert">{err}</div>}
    <div className="form-rows"><div className="form-row" style={{gridTemplateColumns:'1fr 1fr'}}><Field label="Kimai address"><Input value={url} onChange={e=>setUrl(e.target.value)}/></Field><Field label="API token"><Input type="password" autoComplete="off" placeholder={kimai?.connected?'Leave blank to keep the saved token':''} value={token} onChange={e=>setToken(e.target.value)}/></Field></div></div>
    <details className="more tutorial"><summary>How to get an API token</summary><Clip src="/tutorials/kimai-api-token.mp4" label="In Kimai, open your profile menu, choose API access, create a token, and copy it."/></details>
@@ -414,7 +418,7 @@ export default function Studio({displayName}:{displayName:string}){
 // Built-in tutorial clips, recorded by the scripts in source/tutorials/. Silent looping MP4s, shown like GIFs.
 const tutorials=[
  {title:'Log a session',src:'/tutorials/log-session.mp4',steps:'Click the clock on a case. Say what you worked on, set start and end times, and save.'},
- {title:'Connect Kimai',src:'/tutorials/connect-kimai.mp4',steps:'Click your name at the top right, choose Kimai, enter the Kimai address and your API token, and connect.'},
+ {title:'Connect Kimai',src:'/tutorials/connect-kimai.mp4',steps:'Open the menu at the top right, choose Kimai, enter the Kimai address and your API token, and connect.'},
  {title:'Import from Kimai',src:'/tutorials/import-kimai.mp4',steps:'On Cases, click Review next to Kimai. Pick the case for an entry and import it as a session.'},
  {title:'Get a Kimai API token',src:'/tutorials/kimai-api-token.mp4',steps:'In Kimai, open your profile menu, choose API access, create a token, and copy it.'},
 ];
