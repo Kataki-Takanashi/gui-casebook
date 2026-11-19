@@ -289,3 +289,4 @@ main h1:focus{outline:none}
 .clip-wrap{position:relative}
 .clip-toggle{position:absolute;right:10px;bottom:10px;display:grid;place-items:center;width:32px;height:32px;border-radius:999px;background:color-mix(in oklab,var(--background) 85%,transparent);border:1px solid var(--border);color:var(--foreground)}
 .clip-toggle:hover{background:var(--background)}
+.linked-note{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);min-height:36px}

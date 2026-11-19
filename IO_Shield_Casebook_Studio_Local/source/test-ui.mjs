@@ -11,6 +11,11 @@ const pageLocked=()=>page.evaluate(()=>document.body.style.pointerEvents==='none
 async function openLogSession(){await page.getByRole('button',{name:/^Log session/}).first().click();await page.locator('[role=dialog].entry-dialog').waitFor();}
 try{
  await page.goto(BASE);await page.getByRole('heading',{name:'Cases'}).waitFor();
+ // The first page change after load moves focus to the new page's heading.
+ await page.locator('button.case-name').first().click();await page.waitForTimeout(400);
+ check('Opening a case focuses its heading',await page.evaluate(()=>document.activeElement?.tagName==='H1'));
+ await page.goto(BASE+'#/garbage');await page.getByRole('heading',{name:'Cases'}).waitFor();
+ check('Unknown page goes back to Cases',await page.evaluate(()=>location.hash==='#/'));
 
  // Escape on a dropdown closes only the dropdown, never the form, and never locks the page.
  await openLogSession();
