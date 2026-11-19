@@ -6,8 +6,8 @@ const {rec,page,down}=await openRecording();
 try{
  await caption(page,'Open the casebook menu');
  await click(page,page.locator('.book-menu'));
- await caption(page,'Choose Kimai');
- await click(page,page.getByRole('button',{name:'Kimai',exact:true}));
+ await caption(page,'Choose Connect Kimai');
+ await click(page,page.getByRole('button',{name:'Connect Kimai',exact:true}));
  const dialog=page.locator('[role=dialog].entry-dialog').first();
  await dialog.waitFor();
  await caption(page,'Enter your Kimai address');

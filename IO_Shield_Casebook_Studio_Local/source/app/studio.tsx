@@ -420,7 +420,7 @@ export default function Studio({displayName}:{displayName:string}){
 // Built-in tutorial clips, recorded by the scripts in source/tutorials/. Silent looping MP4s, shown like GIFs.
 const tutorials=[
  {title:'Log a session',src:'/tutorials/log-session.mp4',steps:'Click the clock on a case. Say what you worked on, set start and end times, and save.'},
- {title:'Connect Kimai',src:'/tutorials/connect-kimai.mp4',steps:'Open the menu at the top right, choose Kimai, enter the Kimai address and your API token, and connect.'},
+ {title:'Connect Kimai',src:'/tutorials/connect-kimai.mp4',steps:'Open the menu at the top right, choose Connect Kimai, enter the Kimai address and your API token, and connect.'},
  {title:'Import from Kimai',src:'/tutorials/import-kimai.mp4',steps:'On Cases, click Review next to Kimai. Pick the case for an entry and import it as a session.'},
  {title:'Get a Kimai API token',src:'/tutorials/kimai-api-token.mp4',steps:'In Kimai, open your profile menu, choose API access, create a token, and copy it.'},
 ];
