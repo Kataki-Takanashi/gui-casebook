@@ -272,3 +272,12 @@ body[data-scroll-locked]{margin-right:0!important}
 .sticky-bar{padding:10px 2px 12px}
 .tip-pop{width:auto;max-width:260px;padding:8px 10px;font-size:13px}
 @media(max-width:760px){.form-row.times{grid-template-columns:1fr 1fr!important}}
+
+/* Round 6 fixes */
+.sticky-bar{z-index:3;background:var(--popover)}
+.review-dialog .entry-scroll{padding-top:0}
+.review-dialog .group:first-child{padding-top:4px}
+.help-dialog{max-height:92dvh;overflow-y:auto}
+.help-dialog .clip{max-height:calc(100dvh - 240px);object-fit:contain;width:100%}
+[data-slot=select-value]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
+[data-slot=select-trigger]{min-width:0}

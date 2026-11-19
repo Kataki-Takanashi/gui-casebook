@@ -29,6 +29,14 @@ try{
  check('Escape closes an untouched form',!(await dialogOpen()));
  check('Page is clickable after closing',!(await pageLocked()));
 
+ // Escape on an open definition closes only the definition.
+ await openLogSession();await page.waitForTimeout(300);
+ check('Log session starts in What I Worked On',await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')==='What I Worked On'));
+ await page.getByRole('button',{name:'What Time Class means'}).click();await page.locator('.tip-pop').waitFor();
+ await page.keyboard.press('Escape');await page.waitForTimeout(400);
+ check('Escape on a definition keeps the form open',await dialogOpen());
+ await page.keyboard.press('Escape');await page.waitForTimeout(500);
+
  // A typed draft is not thrown away without asking.
  await openLogSession();
  await page.getByLabel(/What I Worked On/).fill('draft that must not vanish');
