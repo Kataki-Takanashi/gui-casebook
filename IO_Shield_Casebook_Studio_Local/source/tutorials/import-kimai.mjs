@@ -13,9 +13,13 @@ try{
  await click(page,bar.getByRole('button',{name:'Review'}));
  const dialog=page.locator('[role=dialog].entry-dialog').first();
  await dialog.getByText('New in Kimai').waitFor();
- await caption(page,'Pick the case, then Import');
+ await caption(page,'Tick an entry. Its case is already picked.');
  await hold(page,500);
- await click(page,dialog.getByRole('button',{name:'Import',exact:true}).first());
+ await click(page,dialog.getByRole('checkbox',{name:/Listed switches/}));
+ await caption(page,'Import it');
+ const importBtn=dialog.getByRole('button',{name:/^Import 1 selected/});
+ await click(page,importBtn);
+ await click(page,dialog.getByRole('button',{name:/as sessions\?/}));
  await caption(page,'It is now a session');
  await hold(page,500);
  await page.keyboard.press('Escape');

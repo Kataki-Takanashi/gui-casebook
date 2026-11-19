@@ -18,7 +18,7 @@ try{
  await click(page,start);await start.fill('18:00');
  await click(page,end);await end.fill('19:30');
  await caption(page,'Hours fill in. Save.');
- await dialog.getByLabel('Hours').waitFor();
+ await dialog.getByRole('spinbutton',{name:'Hours'}).waitFor();
  await page.waitForFunction(()=>[...document.querySelectorAll('[role=dialog] input')].some(i=>i.value==='1.5'||i.value==='1.50'));
  await hold(page,600);
  await click(page,dialog.getByRole('button',{name:'Save',exact:true}));
