@@ -464,11 +464,12 @@ const tutorials=[
 ];
 function Clip({src,label}:{src:string,label:string}){
  const ref=useRef<HTMLVideoElement>(null),[missing,setMissing]=useState(false),still=typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
- useEffect(()=>{if(!still)ref.current?.play().catch(()=>{});},[src]);
- const [paused,setPaused]=useState(still);
+ const [paused,setPaused]=useState(true);
+ // Play only while the clip is actually on screen (a closed section or a hidden tab doesn't count), from the start each time.
+ useEffect(()=>{const v=ref.current;if(!v||still)return;const io=new IntersectionObserver(([e])=>{if(e.isIntersecting&&e.intersectionRatio>0.5){v.currentTime=0;v.play().catch(()=>{});}else v.pause();},{threshold:[0,0.5]});io.observe(v);return()=>io.disconnect();},[src]);
  if(missing)return null;
  const toggle=()=>{const v=ref.current;if(!v)return;if(v.paused)v.play().catch(()=>{});else v.pause();};
- return <div className="clip-wrap"><video ref={ref} className="clip" src={src} aria-label={label} muted playsInline loop autoPlay={!still} controls={still} preload="metadata" onPlay={()=>setPaused(false)} onPause={()=>setPaused(true)} onClick={toggle} onError={()=>setMissing(true)}/>{!still&&<button type="button" className="clip-toggle" onClick={toggle} aria-label={paused?'Play clip':'Pause clip'}>{paused?<Play size={15}/>:<Pause size={15}/>}</button>}</div>;
+ return <div className="clip-wrap"><video ref={ref} className="clip" src={src} aria-label={label} muted playsInline loop controls={still} preload="metadata" onPlay={()=>setPaused(false)} onPause={()=>setPaused(true)} onClick={toggle} onError={()=>setMissing(true)}/>{!still&&<button type="button" className="clip-toggle" onClick={toggle} aria-label={paused?'Play clip':'Pause clip'}>{paused?<Play size={15}/>:<Pause size={15}/>}</button>}</div>;
 }
 function SuggestInput({value,onChange,options,label}:{value:string,onChange:(v:string)=>void,options:string[],label:string}){
  const [open,setOpen]=useState(false),[active,setActive]=useState(-1),id=useRef('s'+Math.random().toString(36).slice(2,8)).current;
