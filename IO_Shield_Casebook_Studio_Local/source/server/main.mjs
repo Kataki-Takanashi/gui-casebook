@@ -36,7 +36,8 @@ async function respond(req,res){
   res.writeHead(200,{...headers,'Content-Length':size});if(req.method==='HEAD')return res.end();fs.createReadStream(filename).pipe(res);
  }catch(e){console.error('Local request failed:',e);if(!res.headersSent)res.writeHead(500,{'Content-Type':'application/json',...security});res.end(JSON.stringify({error:'Local request failed. Check the console; your previous saved data is retained.'}));}
 }
-const server=http.createServer((req,res)=>{queue=queue.then(()=>respond(req,res)).catch(e=>console.error(e));});
+// Writes run one at a time (the revision check relies on it); reads and page files don't wait behind a slow Kimai call.
+const server=http.createServer((req,res)=>{if(req.method==='GET'||req.method==='HEAD'){respond(req,res).catch(e=>console.error(e));return;}queue=queue.then(()=>respond(req,res)).catch(e=>console.error(e));});
 server.on('error',e=>{if(e.code==='EADDRINUSE')console.error('Port '+port+' is in use. Another Casebook Studio window may already be running.');else console.error(e);process.exitCode=1;closeStorage();});
 server.listen(port,'127.0.0.1',()=>{
  console.log('\nI/O Shield Casebook Studio · LOCAL 0.1.1\n\nOpen: '+origin+'\nData: '+dataRoot+'\n\nKeep this window open. Press Ctrl+C to stop.\n');

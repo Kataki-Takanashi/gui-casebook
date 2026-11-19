@@ -76,12 +76,16 @@ async function pullInto(b:any,owner:string,row:any,e:K.KimaiEntry){
 }
 async function kimaiStatus(b:any,owner:string,apply:boolean){
  const cfg=await kimaiConfig();if(!cfg)return {connected:false};
- const since=sinceDate(),remote=await K.entries(cfg,since),byId=new Map(remote.map(e=>[e.id,e]));
+ // One paged list from Kimai covers both new entries (last WINDOW_DAYS) and every linked session (from the oldest link),
+ // instead of fetching old links one by one. An entry missing from that list really was deleted in Kimai.
  const map=await caseMap(b.id),linkList=await links(b.id),linkedIds=new Set(linkList.map(l=>l.kimai_id)),linkedSessions=new Set(linkList.map(l=>l.session_id));
+ const since=sinceDate(),oldest=linkList.reduce((d,l)=>l.synced?.kimai?.date&&l.synced.kimai.date<d?l.synced.kimai.date:d,since);
+ const remote=await K.entries(cfg,oldest),byId=new Map(remote.map(e=>[e.id,e])),rowsById=new Map(sessionRows(b).map((r:any)=>[r.values.A,r]));
  const conflicts:any[]=[],missing:any[]=[];let pulled=0,pushed=0;
  for(const l of linkList){
-  let e=byId.get(l.kimai_id)??null;if(!e&&linkList.length<=200)e=await K.entry(cfg,l.kimai_id);
-  const row=sessionRows(b).find((r:any)=>r.values.A===l.session_id);
+  // Not in the list (it may have moved earlier than the oldest link): check that one entry directly before calling it deleted.
+  let e=byId.get(l.kimai_id)??null;if(!e)e=await K.entry(cfg,l.kimai_id);
+  const row=rowsById.get(l.session_id);
   if(!e||!row){missing.push({session_id:l.session_id,kimai_id:l.kimai_id,reason:!e?'kimai':'casebook'});continue;}
   const app=appFields(row,map,l.synced.kimai),kimai=K.entryFields(e);if(!app)continue;
   const appChanged=!same(app,l.synced.app),kimaiChanged=!same(kimai,l.synced.kimai);
@@ -96,7 +100,7 @@ async function kimaiStatus(b:any,owner:string,apply:boolean){
  const byName=(e:K.KimaiEntry)=>{const k=words(e.projectName+' '+e.activityName);let best='',score=0;for(const c of cases){if(c.values.D==='Parent Project')continue;const n=[...words(c.values.C??'')].filter(w=>k.has(w)).length;if(n>score){score=n;best=c.values.A;}}return best;};
  // Exact activity match first, then a name match, then any case already linked to the same Kimai project.
  const suggest=(e:K.KimaiEntry)=>Object.entries(map).find(([,m])=>m.project===e.project&&m.activity===e.activity)?.[0]||byName(e)||Object.entries(map).find(([,m])=>m.project===e.project)?.[0]||'';
- const fresh=remote.filter(e=>!linkedIds.has(e.id)).map(e=>{const match=rows.find((r:any)=>!linkedSessions.has(r.values.A)&&excelDate(r.values.B)===e.date&&clockTime(r.values.J)===e.start);return {...e,suggested_case:match?.values.C??suggest(e),match_session:match?.values.A??null};});
+ const fresh=remote.filter(e=>!linkedIds.has(e.id)&&e.date>=since).map(e=>{const match=rows.find((r:any)=>!linkedSessions.has(r.values.A)&&excelDate(r.values.B)===e.date&&clockTime(r.values.J)===e.start);return {...e,suggested_case:match?.values.C??suggest(e),match_session:match?.values.A??null};});
  const matched=new Set(fresh.map(f=>f.match_session).filter(Boolean));
  const toSend=rows.filter((r:any)=>!linkedSessions.has(r.values.A)&&!matched.has(r.values.A)&&['T1','T2','T3'].includes(r.values.I)&&map[r.values.C]&&excelDate(r.values.B)>=since&&clockTime(r.values.J)&&clockTime(r.values.K))
   .map((r:any)=>({session_id:r.values.A,case_id:r.values.C,date:excelDate(r.values.B),start:clockTime(r.values.J),end:clockTime(r.values.K),description:r.values.D}));

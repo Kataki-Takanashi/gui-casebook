@@ -7777,14 +7777,16 @@ function exportWorkbook(original, edits) {
   for (const [sheet, changes] of Object.entries(edits)) {
     if (!sheetPaths[sheet]) throw Error("A changed sheet is missing.");
     const doc = xml(files[sheetPaths[sheet]]), data = els(doc, "sheetData")[0];
+    const rowsByNum = new Map(els(data, "row").map((r) => [+r.getAttribute("r"), r])), template = rowsByNum.get(5), templateCells = new Map(template ? els(template, "c").map((t) => [t.getAttribute("r").replace(/\d+$/, ""), t]) : []);
     for (const [rowNumber, values] of Object.entries(changes)) {
       const n = +rowNumber;
-      let row = els(data, "row").find((r) => +r.getAttribute("r") === n);
+      let row = rowsByNum.get(n);
       if (!row) {
         row = doc.createElementNS(NS, "row");
         row.setAttribute("r", rowNumber);
-        const next = els(data, "row").find((r) => +r.getAttribute("r") > n);
-        data.insertBefore(row, next ?? null);
+        const after = [...rowsByNum.keys()].filter((k) => k > n).sort((a, b) => a - b)[0];
+        data.insertBefore(row, after === void 0 ? null : rowsByNum.get(after));
+        rowsByNum.set(n, row);
       }
       for (const [col, value] of Object.entries(values)) {
         const ref = col + rowNumber;
@@ -7792,8 +7794,7 @@ function exportWorkbook(original, edits) {
         if (!c) {
           c = doc.createElementNS(NS, "c");
           c.setAttribute("r", ref);
-          const template = els(data, "row").find((r) => r.getAttribute("r") === "5");
-          const templateCell = template && els(template, "c").find((t) => t.getAttribute("r") === col + "5");
+          const templateCell = templateCells.get(col);
           if (templateCell?.hasAttribute("s")) c.setAttribute("s", templateCell.getAttribute("s"));
           const next = els(row, "c").find((c2) => columnNumber(c2.getAttribute("r").replace(/\d+$/, "")) > columnNumber(col));
           row.insertBefore(c, next ?? null);
@@ -8061,14 +8062,15 @@ async function pullInto(b, owner, row, e) {
 async function kimaiStatus(b, owner, apply) {
   const cfg = await kimaiConfig();
   if (!cfg) return { connected: false };
-  const since = sinceDate(), remote = await entries(cfg, since), byId = new Map(remote.map((e) => [e.id, e]));
   const map = await caseMap(b.id), linkList = await links(b.id), linkedIds = new Set(linkList.map((l) => l.kimai_id)), linkedSessions = new Set(linkList.map((l) => l.session_id));
+  const since = sinceDate(), oldest = linkList.reduce((d, l) => l.synced?.kimai?.date && l.synced.kimai.date < d ? l.synced.kimai.date : d, since);
+  const remote = await entries(cfg, oldest), byId = new Map(remote.map((e) => [e.id, e])), rowsById = new Map(sessionRows(b).map((r) => [r.values.A, r]));
   const conflicts = [], missing = [];
   let pulled = 0, pushed = 0;
   for (const l of linkList) {
     let e = byId.get(l.kimai_id) ?? null;
-    if (!e && linkList.length <= 200) e = await entry(cfg, l.kimai_id);
-    const row = sessionRows(b).find((r) => r.values.A === l.session_id);
+    if (!e) e = await entry(cfg, l.kimai_id);
+    const row = rowsById.get(l.session_id);
     if (!e || !row) {
       missing.push({ session_id: l.session_id, kimai_id: l.kimai_id, reason: !e ? "kimai" : "casebook" });
       continue;
@@ -8108,7 +8110,7 @@ async function kimaiStatus(b, owner, apply) {
     return best;
   };
   const suggest = (e) => Object.entries(map).find(([, m]) => m.project === e.project && m.activity === e.activity)?.[0] || byName(e) || Object.entries(map).find(([, m]) => m.project === e.project)?.[0] || "";
-  const fresh = remote.filter((e) => !linkedIds.has(e.id)).map((e) => {
+  const fresh = remote.filter((e) => !linkedIds.has(e.id) && e.date >= since).map((e) => {
     const match = rows.find((r) => !linkedSessions.has(r.values.A) && excelDate(r.values.B) === e.date && clockTime(r.values.J) === e.start);
     return { ...e, suggested_case: match?.values.C ?? suggest(e), match_session: match?.values.A ?? null };
   });
@@ -8459,6 +8461,10 @@ async function respond(req, res) {
   }
 }
 var server = http.createServer((req, res) => {
+  if (req.method === "GET" || req.method === "HEAD") {
+    respond(req, res).catch((e) => console.error(e));
+    return;
+  }
   queue = queue.then(() => respond(req, res)).catch((e) => console.error(e));
 });
 server.on("error", (e) => {
