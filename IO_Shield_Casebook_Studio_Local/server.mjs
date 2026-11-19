@@ -7649,11 +7649,12 @@ function validateEntry(data, edits, sheet, row, values) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(values.A)) throw Error("Use letters, numbers, periods, underscores, or hyphens in the record ID.");
   const caseId = sheet === "Session Ledger" ? values.C : values.B;
   if (sheet !== "Case Register" && !rowsFor(data, edits, "Case Register").some((r) => r.values.A === caseId)) throw Error("Choose a case from this casebook.");
-  for (const col of dateColumns[sheet] ?? []) if (values[col] && (!/^\d{4}-\d{2}-\d{2}$/.test(values[col]) || (/* @__PURE__ */ new Date(values[col] + "T00:00:00Z")).toISOString().slice(0, 10) !== values[col])) throw Error("Enter a valid date.");
+  for (const col of dateColumns[sheet] ?? []) if (values[col] && (!/^\d{4}-\d{2}-\d{2}$/.test(values[col]) || (/* @__PURE__ */ new Date(values[col] + "T00:00:00Z")).toISOString().slice(0, 10) !== values[col] || values[col] < "1900-01-01" || values[col] > "2100-12-31")) throw Error("Enter a valid date.");
   if (sheet === "Session Ledger") {
     if (!Object.keys(timeNames).includes(values.I)) throw Error("Choose a time class.");
     if (["T4", "T5"].includes(values.I) && values.L) throw Error("Leave hours blank for T4 and T5.");
-    if (["T1", "T2", "T3"].includes(values.I) && (!values.L || !Number.isFinite(+values.L) || +values.L <= 0 || +values.L > 24)) throw Error("Enter hours above 0, up to 24.");
+    if (["T1", "T2", "T3"].includes(values.I) && (!/^\d{0,2}(\.\d+)?$/.test(values.L?.trim() ?? "") || +values.L <= 0 || +values.L > 24)) throw Error("Enter hours above 0, up to 24.");
+    for (const col of ["J", "K"]) if (values[col] && !clockTime(values[col])) throw Error(`Enter a valid ${col === "J" ? "start" : "end"} time.`);
     if (!/^[0-5]$/.test(values.P)) throw Error("Choose a work level.");
   }
   if (sheet === "Case Register" && !Object.keys(timeNames).includes(values.N)) throw Error("Choose a time class.");
@@ -7794,7 +7795,7 @@ function exportWorkbook(original, edits) {
         const numeric = (dateColumns[sheet] ?? []).includes(col) && /^\d{4}-\d{2}-\d{2}$/.test(value) || (numericColumns[sheet] ?? []).includes(col) && value !== "" && Number.isFinite(+value);
         if (numeric) {
           const v = doc.createElementNS(NS, "v");
-          v.textContent = (dateColumns[sheet] ?? []).includes(col) ? dateSerial(value) : value;
+          v.textContent = (dateColumns[sheet] ?? []).includes(col) ? dateSerial(value) : String(+value);
           c.appendChild(v);
         } else {
           c.setAttribute("t", "inlineStr");
@@ -7858,7 +7859,7 @@ var KimaiError = class extends Error {
 async function call(cfg, path3, init = {}) {
   let r;
   try {
-    r = await fetch(cfg.url.replace(/\/+$/, "") + path3, { ...init, headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/json", ...init.body ? { "Content-Type": "application/json" } : {} }, signal: AbortSignal.timeout(12e3) });
+    r = await fetch(cfg.url.replace(/\/+$/, "") + path3, { ...init, headers: { Authorization: `Bearer ${cfg.token}`, Accept: "application/json", ...init.body ? { "Content-Type": "application/json" } : {} }, signal: AbortSignal.timeout(6e3) });
   } catch {
     throw new KimaiError("Kimai is not reachable right now.");
   }
@@ -8189,33 +8190,38 @@ async function kimaiRoute(path3, method, request, owner) {
   }
   if (path3[3] === "import" && method === "POST") {
     let done = 0, names = null;
-    const created = [], linked = [];
+    const created = [], linked = [], failed = [];
     for (const item of (body.items ?? []).slice(0, 200)) {
-      const e = await entry(cfg, +item.kimai_id);
-      if (!e) continue;
-      if (!e.activityName || !e.projectName) {
-        names ??= await catalog(cfg);
-        e.activityName ||= names.activities.find((a) => a.id === e.activity)?.name ?? "";
-        e.projectName ||= names.projects.find((p) => p.id === e.project)?.name ?? "";
+      try {
+        const e = await entry(cfg, +item.kimai_id);
+        if (!e) continue;
+        if (!e.activityName || !e.projectName) {
+          names ??= await catalog(cfg);
+          e.activityName ||= names.activities.find((a) => a.id === e.activity)?.name ?? "";
+          e.projectName ||= names.projects.find((p) => p.id === e.project)?.name ?? "";
+        }
+        if (await db().prepare("SELECT 1 FROM kimai_links WHERE book_id=? AND kimai_id=?").bind(b.id, e.id).first()) continue;
+        let sessionId = item.link_session;
+        if (!sessionId) {
+          const { row: row2, values } = importValues(b, e, item.case_id);
+          await saveEntry(b, owner, SESSIONS, row2, values, "kimai");
+          sessionId = values.A;
+          created.push(values.A);
+        } else linked.push(sessionId);
+        const map = await caseMap(b.id), caseId = sessionRows(b).find((r) => r.values.A === sessionId)?.values.C;
+        if (caseId && !map[caseId]) {
+          await db().prepare("INSERT INTO kimai_case_map (book_id,case_id,project,activity) VALUES (?,?,?,?)").bind(b.id, caseId, e.project, e.activity).run();
+          map[caseId] = { project: e.project, activity: e.activity };
+        }
+        const row = sessionRows(b).find((r) => r.values.A === sessionId);
+        await saveLink(b.id, sessionId, e.id, appFields(row, map, entryFields(e)) ?? entryFields(e), entryFields(e));
+        done++;
+      } catch (err2) {
+        if (err2 instanceof KimaiError) throw err2;
+        failed.push({ kimai_id: +item.kimai_id, reason: err2.message });
       }
-      if (await db().prepare("SELECT 1 FROM kimai_links WHERE book_id=? AND kimai_id=?").bind(b.id, e.id).first()) continue;
-      let sessionId = item.link_session;
-      if (!sessionId) {
-        const { row: row2, values } = importValues(b, e, item.case_id);
-        await saveEntry(b, owner, SESSIONS, row2, values, "kimai");
-        sessionId = values.A;
-        created.push(values.A);
-      } else linked.push(sessionId);
-      const map = await caseMap(b.id), caseId = sessionRows(b).find((r) => r.values.A === sessionId)?.values.C;
-      if (caseId && !map[caseId]) {
-        await db().prepare("INSERT INTO kimai_case_map (book_id,case_id,project,activity) VALUES (?,?,?,?)").bind(b.id, caseId, e.project, e.activity).run();
-        map[caseId] = { project: e.project, activity: e.activity };
-      }
-      const row = sessionRows(b).find((r) => r.values.A === sessionId);
-      await saveLink(b.id, sessionId, e.id, appFields(row, map, entryFields(e)) ?? entryFields(e), entryFields(e));
-      done++;
     }
-    return json({ imported: done, created, linked, revision: b.revision, edits: JSON.parse(b.edits), updated: b.updated });
+    return json({ imported: done, created, linked, failed, revision: b.revision, edits: JSON.parse(b.edits), updated: b.updated });
   }
   if (path3[3] === "send" && method === "POST") {
     const r = await afterSessionSave(b, String(body.session_id), true);

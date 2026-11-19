@@ -309,3 +309,10 @@ body[data-scroll-locked]{margin-right:0!important}
 /* Phone sidebar sheet: line items up with the brand. */
 [data-mobile=true] [data-sidebar=menu]{padding:0 12px}
 [data-mobile=true] [data-sidebar=menu-button]{height:40px;font-size:15px}
+
+/* Long unbroken titles must wrap, never widen the page. */
+.case-head>div{min-width:0}
+.case-head h1,.review-row strong,.portfolio-story{overflow-wrap:anywhere}
+.case-row>.num:nth-last-child(2),.case-row .num{font-variant-numeric:tabular-nums}
+/* Mixed-direction titles (Arabic, Hebrew) take their direction from their own text. */
+.case-name,.case-head h1,.review-row strong,.history-row .case-name{unicode-bidi:plaintext}

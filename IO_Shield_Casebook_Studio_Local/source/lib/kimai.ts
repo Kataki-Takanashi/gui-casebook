@@ -11,7 +11,7 @@ export class KimaiError extends Error{constructor(message:string,public status=0
 
 async function call(cfg:KimaiConfig,path:string,init:RequestInit={}):Promise<{body:any,headers:Headers}>{
  let r:Response;
- try{r=await fetch(cfg.url.replace(/\/+$/,'')+path,{...init,headers:{Authorization:`Bearer ${cfg.token}`,Accept:'application/json',...(init.body?{'Content-Type':'application/json'}:{})},signal:AbortSignal.timeout(12000)});}
+ try{r=await fetch(cfg.url.replace(/\/+$/,'')+path,{...init,headers:{Authorization:`Bearer ${cfg.token}`,Accept:'application/json',...(init.body?{'Content-Type':'application/json'}:{})},signal:AbortSignal.timeout(6000)});}
  catch{throw new KimaiError('Kimai is not reachable right now.');}
  const text=await r.text();
  if(r.status===401||r.status===403)throw new KimaiError('Kimai did not accept your API token. Create a new one in Kimai and connect again.',r.status);

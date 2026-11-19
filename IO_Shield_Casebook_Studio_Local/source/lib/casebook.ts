@@ -29,11 +29,12 @@ export function validateEntry(data:BookData,edits:Edits,sheet:string,row:number,
  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(values.A))throw Error('Use letters, numbers, periods, underscores, or hyphens in the record ID.');
  const caseId=sheet==='Session Ledger'?values.C:values.B;
  if(sheet!=='Case Register'&&!rowsFor(data,edits,'Case Register').some(r=>r.values.A===caseId))throw Error('Choose a case from this casebook.');
- for(const col of dateColumns[sheet]??[])if(values[col]&&(!/^\d{4}-\d{2}-\d{2}$/.test(values[col])||new Date(values[col]+'T00:00:00Z').toISOString().slice(0,10)!==values[col]))throw Error('Enter a valid date.');
+ for(const col of dateColumns[sheet]??[])if(values[col]&&(!/^\d{4}-\d{2}-\d{2}$/.test(values[col])||new Date(values[col]+'T00:00:00Z').toISOString().slice(0,10)!==values[col]||values[col]<'1900-01-01'||values[col]>'2100-12-31'))throw Error('Enter a valid date.');
  if(sheet==='Session Ledger'){
   if(!Object.keys(timeNames).includes(values.I))throw Error('Choose a time class.');
   if(['T4','T5'].includes(values.I)&&values.L)throw Error('Leave hours blank for T4 and T5.');
-  if(['T1','T2','T3'].includes(values.I)&&(!values.L||!Number.isFinite(+values.L)||+values.L<=0||+values.L>24))throw Error('Enter hours above 0, up to 24.');
+  if(['T1','T2','T3'].includes(values.I)&&(!/^\d{0,2}(\.\d+)?$/.test(values.L?.trim()??'')||+values.L<=0||+values.L>24))throw Error('Enter hours above 0, up to 24.');
+  for(const col of ['J','K'])if(values[col]&&!clockTime(values[col]))throw Error(`Enter a valid ${col==='J'?'start':'end'} time.`);
   if(!/^[0-5]$/.test(values.P))throw Error('Choose a work level.');
  }
  if(sheet==='Case Register'&&!Object.keys(timeNames).includes(values.N))throw Error('Choose a time class.');

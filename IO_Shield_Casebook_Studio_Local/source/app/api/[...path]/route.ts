@@ -148,8 +148,9 @@ async function kimaiRoute(path:string[],method:string,request:Request,owner:stri
   return json({map:await caseMap(b.id)});
  }
  if(path[3]==='import'&&method==='POST'){
-  let done=0,names:any=null;const created:string[]=[],linked:string[]=[];
-  for(const item of (body.items??[]).slice(0,200)){
+  // Each entry is imported on its own: one bad entry is reported and skipped, the rest still import (and stay undoable).
+  let done=0,names:any=null;const created:string[]=[],linked:string[]=[],failed:{kimai_id:number,reason:string}[]=[];
+  for(const item of (body.items??[]).slice(0,200)){try{
    const e=await K.entry(cfg,+item.kimai_id);if(!e)continue;
    // A single timesheet comes back with the activity as a bare id, so look its name up for the session title.
    if(!e.activityName||!e.projectName){names??=await K.catalog(cfg);e.activityName||=names.activities.find((a:any)=>a.id===e.activity)?.name??'';e.projectName||=names.projects.find((p:any)=>p.id===e.project)?.name??'';}
@@ -160,8 +161,8 @@ async function kimaiRoute(path:string[],method:string,request:Request,owner:stri
    if(caseId&&!map[caseId]){await db().prepare('INSERT INTO kimai_case_map (book_id,case_id,project,activity) VALUES (?,?,?,?)').bind(b.id,caseId,e.project,e.activity).run();map[caseId]={project:e.project,activity:e.activity};}
    const row=sessionRows(b).find((r:any)=>r.values.A===sessionId);
    await saveLink(b.id,sessionId!,e.id,appFields(row,map,K.entryFields(e))??K.entryFields(e),K.entryFields(e));done++;
-  }
-  return json({imported:done,created,linked,revision:b.revision,edits:JSON.parse(b.edits),updated:b.updated});
+  }catch(err){if(err instanceof K.KimaiError)throw err;failed.push({kimai_id:+item.kimai_id,reason:(err as Error).message});}}
+  return json({imported:done,created,linked,failed,revision:b.revision,edits:JSON.parse(b.edits),updated:b.updated});
  }
  if(path[3]==='send'&&method==='POST'){const r=await afterSessionSave(b,String(body.session_id),true);if(r?.status==='error')throw Error(r.error);return json(r??{});}
  // Undo an import: unlink, and remove the sessions the import created. Kimai is not touched.
