@@ -8188,11 +8188,16 @@ async function kimaiRoute(path3, method, request, owner) {
     return json({ map: await caseMap(b.id) });
   }
   if (path3[3] === "import" && method === "POST") {
-    let done = 0;
+    let done = 0, names = null;
     const created = [], linked = [];
     for (const item of (body.items ?? []).slice(0, 200)) {
       const e = await entry(cfg, +item.kimai_id);
       if (!e) continue;
+      if (!e.activityName || !e.projectName) {
+        names ??= await catalog(cfg);
+        e.activityName ||= names.activities.find((a) => a.id === e.activity)?.name ?? "";
+        e.projectName ||= names.projects.find((p) => p.id === e.project)?.name ?? "";
+      }
       if (await db().prepare("SELECT 1 FROM kimai_links WHERE book_id=? AND kimai_id=?").bind(b.id, e.id).first()) continue;
       let sessionId = item.link_session;
       if (!sessionId) {

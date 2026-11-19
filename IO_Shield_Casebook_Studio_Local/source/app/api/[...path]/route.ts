@@ -147,9 +147,11 @@ async function kimaiRoute(path:string[],method:string,request:Request,owner:stri
   return json({map:await caseMap(b.id)});
  }
  if(path[3]==='import'&&method==='POST'){
-  let done=0;const created:string[]=[],linked:string[]=[];
+  let done=0,names:any=null;const created:string[]=[],linked:string[]=[];
   for(const item of (body.items??[]).slice(0,200)){
    const e=await K.entry(cfg,+item.kimai_id);if(!e)continue;
+   // A single timesheet comes back with the activity as a bare id, so look its name up for the session title.
+   if(!e.activityName||!e.projectName){names??=await K.catalog(cfg);e.activityName||=names.activities.find((a:any)=>a.id===e.activity)?.name??'';e.projectName||=names.projects.find((p:any)=>p.id===e.project)?.name??'';}
    if(await db().prepare('SELECT 1 FROM kimai_links WHERE book_id=? AND kimai_id=?').bind(b.id,e.id).first())continue;
    let sessionId=item.link_session as string|undefined;
    if(!sessionId){const {row,values}=importValues(b,e,item.case_id);await saveEntry(b,owner,SESSIONS,row,values,'kimai');sessionId=values.A;created.push(values.A);}else linked.push(sessionId);
