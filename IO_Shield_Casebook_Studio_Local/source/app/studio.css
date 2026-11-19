@@ -58,9 +58,9 @@ h2{font-size:15px;font-weight:600}
 .group-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;min-height:28px}
 .group-head .text-btn{margin-left:auto}
 .list{background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.case-row{display:grid;grid-template-columns:118px minmax(140px,1fr) minmax(0,200px) 5rem 4rem;align-items:center;gap:16px;width:100%;padding:11px 16px;text-align:left;border-top:1px solid var(--border);font-size:14px}
+.case-row{display:grid;grid-template-columns:118px minmax(140px,2fr) minmax(0,1fr) 5rem 4rem;align-items:center;gap:16px;width:100%;padding:12px 16px;text-align:left;border-top:1px solid var(--border);font-size:14px}
 .list>.case-row:first-child{border-top:0}
-.case-row.with-action{grid-template-columns:118px minmax(0,1fr) minmax(0,200px) 5rem minmax(0,7rem) 28px;cursor:pointer}
+.case-row.with-action{grid-template-columns:118px minmax(0,2fr) minmax(0,1fr) 5rem 7rem 28px;cursor:pointer}
 button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500;color:inherit;cursor:pointer}
 .row-action{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;color:var(--primary);opacity:.75}
 .case-row:hover .row-action,.row-action:focus-visible{opacity:1}
@@ -100,7 +100,7 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .error-banner{display:flex;align-items:center;justify-content:space-between;gap:16px}
 
 /* Entry dialog */
-.entry-dialog{width:min(720px,calc(100vw - 24px));max-width:720px!important;padding:22px 24px;max-height:92dvh;gap:14px}
+.entry-dialog{width:min(720px,calc(100vw - 24px));max-width:720px!important;padding:24px;max-height:92dvh;gap:14px}
 .entry-dialog [data-slot=dialog-title]{font-size:19px;line-height:1.3}
 .entry-scroll{overflow-y:auto;max-height:calc(92dvh - 140px);padding:2px 2px 4px;border:1.5px dashed transparent;border-radius:8px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
@@ -108,7 +108,7 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .form-row{display:grid;gap:16px}
 .suggest{position:relative}
 .suggest-list{position:absolute;z-index:20;top:calc(100% + 4px);left:0;right:0;background:var(--popover);border:1px solid var(--border);border-radius:7px;box-shadow:0 6px 20px #0001;padding:4px;max-height:220px;overflow:auto}
-.suggest-list button{display:block;width:100%;text-align:left;padding:6px 9px;border-radius:5px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.suggest-list button{display:block;width:100%;text-align:left;padding:6px 8px;border-radius:5px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .suggest-list button:hover,.suggest-list button.active{background:var(--muted)}
 .history-diff{display:grid;gap:6px;padding:10px 16px 14px;background:var(--muted);font-size:13px}
 .history-diff>div{display:grid;grid-template-columns:140px 1fr;gap:12px}
@@ -149,14 +149,14 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .history-item{position:relative;border-top:1px solid var(--border)}
 .list>.history-item:first-child{border-top:0}
 .history-item>.history-undo{position:absolute;top:8px;right:12px;min-height:28px;padding:0 6px}
-.history-row summary{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:16px;padding:11px 16px;font-size:14px;cursor:pointer;list-style:none}
+.history-row summary{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:16px;padding:12px 16px;font-size:14px;cursor:pointer;list-style:none}
 .history-row summary{padding-right:72px}
 @media(hover:hover){.history-row summary:hover{background:var(--muted)}}
 
 /* Forms and dialogs */
 .picker-pop{width:var(--radix-popover-trigger-width);min-width:300px;max-width:min(560px,88vw)}
 .field-label{display:inline-flex;align-items:center;gap:6px}
-.tip-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:999px;font-size:10px;font-weight:700;color:var(--muted-foreground);box-shadow:inset 0 0 0 1px var(--input);cursor:help}
+.tip-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:999px;font-size:10px;font-weight:600;color:var(--muted-foreground);box-shadow:inset 0 0 0 1px var(--input);cursor:help}
 .tip-btn:hover{color:var(--foreground)}
 .dialog-actions .delete-btn{margin-right:auto;color:var(--destructive)}
 .armed{background:var(--destructive)!important;color:var(--destructive-foreground)!important}
@@ -165,7 +165,7 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .diff{font-size:13px}.diff b{font-weight:600}
 .help-dialog{width:min(1000px,calc(100vw - 24px));max-width:1000px!important;max-height:92dvh;overflow-y:auto}
 .more summary .muted{font-weight:400;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-@media(max-width:900px){.case-row.with-action{grid-template-columns:118px minmax(0,1fr) auto auto 28px}.case-row.with-action>.muted:not(.num){display:none}}
+@media(max-width:900px){.case-row.with-action{grid-template-columns:118px minmax(0,1fr) 5rem 7rem 28px}.case-row.with-action>.muted:not(.num){display:none}}
 @media(max-width:760px){
  .workspace{padding:20px 16px 48px}
  .topbar{padding:0 12px}
@@ -191,7 +191,7 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .kimai-bar{display:flex;align-items:center;gap:10px;margin:0 0 28px;font-size:13px;color:var(--muted-foreground)}
 .kimai-bar>span:first-of-type{color:var(--foreground)}
 .spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
-.review-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,220px) auto auto;gap:12px;align-items:center;padding:11px 16px;border-top:1px solid var(--border)}
+.review-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,220px) auto auto;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid var(--border)}
 .list>.review-row:first-child{border-top:0}
 .review-row>div{display:flex;flex-direction:column;min-width:0}
 .review-row strong{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -234,7 +234,7 @@ details.more[open]>summary::before{transform:rotate(45deg)}
 .dialog-actions>button.ghost-left:first-child{margin-right:auto}
 .review-group-head .text-btn,.review-group-head button{margin-left:8px}
 .review-group-head>span.muted{margin-left:auto}
-.shortcuts{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted-foreground);margin-top:4px}
+.shortcuts{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted-foreground);margin-top:4px}
 .shortcuts span{display:inline-flex;align-items:center;gap:6px}
 kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;padding:1px 6px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--input);color:var(--foreground)}
 @media(max-width:760px){
@@ -353,6 +353,7 @@ body[data-scroll-locked]{margin-right:0!important}
 @keyframes fade-in{from{opacity:0}}
 .error-banner,.form-error{animation:fade-in 150ms ease-out}
 .icon-btn:disabled{opacity:.5}
-@keyframes pulse{from{opacity:.4}}
-@media (prefers-reduced-motion:reduce){.spin{animation:pulse 1s ease-in-out infinite alternate}}
+@keyframes spin-pulse{from{opacity:.4}}
+@media (prefers-reduced-motion:reduce){.spin{animation:spin-pulse 1s ease-in-out infinite alternate}}
 .more[open] summary .muted{display:none}
+@media(max-width:760px){.dialog-actions .discard-q{flex-basis:100%}}
