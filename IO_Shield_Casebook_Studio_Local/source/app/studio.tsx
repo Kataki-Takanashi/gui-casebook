@@ -69,6 +69,9 @@ if(typeof document!=='undefined'){new MutationObserver(()=>{if(document.body.sty
 let lastOutside:HTMLElement|null=null;
 if(typeof document!=='undefined')document.addEventListener('focusin',e=>{const t=e.target as HTMLElement;if(t!==document.body&&!t.closest('[role=dialog],[data-radix-popper-content-wrapper]'))lastOutside=t;});
 function returnFocus(e:Event){if(lastOutside?.isConnected){e.preventDefault();lastOutside.focus({preventScroll:true});}}
+// After a failed save, mark required fields that are still empty so they turn red and read as invalid.
+const isEmpty=(el:HTMLInputElement)=>el.tagName==='INPUT'||el.tagName==='TEXTAREA'?!el.value:el.hasAttribute('data-placeholder')||/Choose…/.test(el.textContent??'');
+function markEmptyRequired(){setTimeout(()=>document.querySelectorAll<HTMLInputElement>('.entry-dialog [aria-required=true]').forEach(el=>{if(isEmpty(el))el.setAttribute('aria-invalid','true');}),0);}
 // Every dialog runs this first on Escape: close the open dropdown or suggestion list, not the dialog.
 function menuEscape(e:KeyboardEvent){if(Date.now()-menuClosedAt<250){e.preventDefault();return true;}if(closeOpenMenu){e.preventDefault();menuClosedAt=Date.now();const c=closeOpenMenu;closeOpenMenu=null;c();return true;}if(document.querySelector('.suggest-list')){e.preventDefault();(document.activeElement as HTMLElement|null)?.blur();return true;}return false;}
 function Choice({value,onChange,options,label}:{value:string,onChange:(v:string)=>void,options:Option[],label:string}){const [open,setOpenRaw]=useState(false),close=useRef(()=>setOpenRaw(false)).current,setOpen=(o:boolean)=>{setOpenRaw(o);trackMenu(o,close);};const safe:Option[]=value&&!options.some(o=>o[0]===value)?[[value,value],...options]:options;const tip=safe.find(o=>o[0]===value)?.[2];return <Select open={open} onOpenChange={setOpen} value={value||undefined} onValueChange={onChange}><SelectTrigger aria-label={label} className="w-full" title={tip}><SelectValue placeholder="Choose…"/></SelectTrigger><SelectContent className="choice-menu">{safe.map(([v,l,t])=><SelectItem key={v} value={v} hint={t||undefined}>{l}</SelectItem>)}</SelectContent></Select>;}
@@ -225,7 +228,7 @@ export default function Studio({displayName}:{displayName:string}){
    if(r.kimai)kimaiSync(true);
    if(form.sheet===CASES&&!form.existing)goCase(vals.A);
    toast.success(`${labels[form.sheet]} saved.`);
-  }catch(e){const msg=(e as Error).message;setFormError(msg);if(layouts[form.sheet].more.some(c=>msg.includes(labelFor(form.sheet,c))))setMoreOpen(true);try{setBook(await api('books/'+book.id));}catch{}}finally{setSaving(false);}
+  }catch(e){const msg=(e as Error).message;setFormError(msg);markEmptyRequired();if(layouts[form.sheet].more.some(c=>msg.includes(labelFor(form.sheet,c))))setMoreOpen(true);try{setBook(await api('books/'+book.id));}catch{}}finally{setSaving(false);}
  }
  // Delete clears the row; Undo writes the old values back into the same row.
  async function deleteEntry(){if(!form||!book)return;setSaving(true);
@@ -426,7 +429,7 @@ function Field({label,required=false,wide=false,group=false,children}:{label:str
  // Every control passes its own aria-label, so a plain wrapper is fine then.
  const tip=fieldTips[label],Tag=group||tip?'div':'label',ref=useRef<HTMLElement>(null);
  // Controls carry their own aria-label, so mark them required directly for screen readers.
- useEffect(()=>{if(!required)return;ref.current?.querySelectorAll('input,textarea,[role=combobox]').forEach(el=>el.setAttribute('aria-required','true'));});
+ useEffect(()=>{if(!required)return;ref.current?.querySelectorAll<HTMLInputElement>('input,textarea,[role=combobox]').forEach(el=>{el.setAttribute('aria-required','true');if(!isEmpty(el))el.removeAttribute('aria-invalid');});});
  const text=<>{label}{required&&<><b aria-hidden="true"> *</b><span className="sr-only"> (required)</span></>}</>;
  return <Tag ref={ref as any} className={'field '+(wide?'wide':'')}>{tip?<span className="field-label"><span>{text}</span><TipButton label={label} tip={tip}/></span>:<span>{text}</span>}{children}</Tag>;
 }

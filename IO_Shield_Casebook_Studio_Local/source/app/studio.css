@@ -18,7 +18,7 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible,summary:focus-visi
 .studio-sidebar [data-sidebar=menu-button]{height:34px;font-size:14px;border-radius:6px;padding:0 10px}
 .topbar{height:56px;border-bottom:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:space-between;padding:0 24px;gap:12px;position:sticky;top:0;z-index:5}
 .topbar-left,.topbar-actions{display:flex;align-items:center;gap:8px;min-width:0}
-.crumb{display:flex;align-items:center;gap:2px;font-size:14px;color:var(--muted-foreground)}
+.crumb{display:flex;align-items:center;gap:2px;font-size:14px;color:var(--muted-foreground);min-height:32px}
 .crumb:hover{color:var(--foreground)}
 .book-menu{max-width:240px;font-weight:500}
 .book-menu>*:first-child{overflow:hidden;text-overflow:ellipsis}
@@ -42,9 +42,10 @@ h2{font-size:15px;font-weight:600}
 /* Page heading */
 .heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
 .heading-actions{display:flex;align-items:center;gap:8px}
-.search{display:flex;align-items:center;gap:6px;border:1px solid var(--input);border-radius:7px;padding:0 10px;background:var(--card);color:var(--muted-foreground);width:220px}
+.search{display:flex;align-items:center;gap:6px;border:1px solid var(--field-border);border-radius:7px;padding:0 10px;background:var(--card);color:var(--muted-foreground);width:220px}
 .search input{border:0;box-shadow:none;background:transparent;height:34px;padding:0}
-.search input:focus-visible{box-shadow:none}
+.search input:focus-visible{box-shadow:none;outline:none}
+.search:focus-within{outline:2px solid var(--ring);outline-offset:1px}
 
 /* Stats */
 .summary-line{display:flex;flex-wrap:wrap;gap:6px 22px;margin:-6px 0 24px;font-size:14px;color:var(--muted-foreground)}
@@ -124,7 +125,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .picker>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .picker svg{flex-shrink:0;opacity:.5}
 .more{margin-top:16px;border-top:1px solid var(--border);padding-top:12px}
-.more summary{font-size:13px;font-weight:550;color:var(--muted-foreground);cursor:pointer;margin-bottom:12px;width:max-content}
+.more summary{font-size:13px;font-weight:550;color:var(--muted-foreground);cursor:pointer;margin-bottom:6px;padding:6px 0;width:auto;max-width:100%;overflow:hidden}
 .more:not([open]) summary{margin-bottom:0}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:13px;padding:4px 10px;border:1px solid var(--input);border-radius:999px;background:var(--card);max-width:100%}
@@ -149,7 +150,8 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .history-item{position:relative;border-top:1px solid var(--border)}
 .list>.history-item:first-child{border-top:0}
 .history-item>.history-undo{position:absolute;top:8px;right:12px;min-height:28px;padding:0 6px}
-.history-row summary{display:grid;gap:16px;padding:11px 16px;font-size:14px;cursor:pointer;list-style:none}
+.history-row summary{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:16px;padding:11px 16px;font-size:14px;cursor:pointer;list-style:none}
+.history-item:has(>.history-undo)>.history-row summary{padding-right:72px}
 .history-row summary:hover{background:var(--muted)}
 .history-row pre{font-size:12px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--muted);padding:12px 16px;margin:0}
 
@@ -163,13 +165,12 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .head-action{margin-left:auto}
 .review-row.conflict{grid-template-columns:minmax(0,1fr) auto auto}
 .diff{font-size:13px}.diff b{font-weight:600}
-.help-dialog{width:min(1000px,calc(100vw - 24px));max-width:1000px!important}
-.more summary .muted{font-weight:400;margin-left:6px}
+.help-dialog{width:min(1000px,calc(100vw - 24px));max-width:1000px!important;max-height:92dvh;overflow-y:auto}
+.more summary .muted{font-weight:400;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 @media(max-width:900px){.case-row.with-action{grid-template-columns:118px minmax(0,1fr) auto auto 28px}.case-row.with-action>.muted:not(.num){display:none}}
 @media(max-width:760px){
  .workspace{padding:20px 16px 48px}
  .topbar{padding:0 12px}
- .stats{grid-template-columns:repeat(2,1fr)}
  .search{width:100%}
  .heading-actions{width:100%}
  .case-row{grid-template-columns:1fr auto;gap:4px 12px}
@@ -233,8 +234,7 @@ details.more>summary{list-style:none;display:flex;align-items:center;gap:6px}
 details.more>summary::-webkit-details-marker{display:none}
 details.more>summary::before{content:'';width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s ease-out;margin-right:2px}
 details.more[open]>summary::before{transform:rotate(45deg)}
-.history-row summary{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;padding-right:72px}
-.kimai-dialog-actions,.dialog-actions{align-items:center}
+.dialog-actions{align-items:center}
 .dialog-actions>button.ghost-left:first-child{margin-right:auto}
 .review-group-head .text-btn,.review-group-head button{margin-left:8px}
 .review-group-head>span.muted{margin-left:auto}
@@ -245,7 +245,6 @@ kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;paddi
  .topbar{gap:4px}
  .topbar-actions{gap:2px}
  .book-menu{max-width:96px}
- .primary-button.size-log{padding:0 10px}
  .crumb{font-size:13px}
  .case-row:not(.with-action){grid-template-columns:minmax(0,1fr) auto}
  .case-row:not(.with-action)>.case-name{grid-column:1/-1;grid-row:1}
@@ -255,8 +254,6 @@ kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;paddi
 @media(max-width:760px){.wide-only{display:none}.narrow-only{display:inline}}
 
 /* More summary, sticky import bar, collapsed sidebar */
-.more summary{width:auto;max-width:100%;overflow:hidden}
-.more summary .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .review-dialog .entry-scroll{padding-top:0;padding-bottom:0}
 .sticky-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px 12px;margin-top:8px;background:var(--popover);border-top:1px solid var(--border);z-index:3}
 .primary-confirm:not(:disabled):not(.armed){border-color:var(--primary);color:var(--primary)}
@@ -269,7 +266,6 @@ body[data-scroll-locked]{margin-right:0!important}
 
 /* Help dialog and select values */
 .review-dialog .group:first-child{padding-top:4px}
-.help-dialog{max-height:92dvh;overflow-y:auto}
 .help-dialog .clip{max-height:calc(100dvh - 240px);object-fit:contain;width:100%}
 [data-slot=select-value]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
 [data-slot=select-trigger]{min-width:0}
@@ -284,22 +280,26 @@ body[data-scroll-locked]{margin-right:0!important}
 .linked-note{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);min-height:36px}
 
 /* Audit: field boundaries and focus need 3:1 against the card. */
-[data-slot=input],[data-slot=textarea],[data-slot=select-trigger],.picker{border-color:var(--field-border)}
-[data-slot=input]:focus-visible,[data-slot=textarea]:focus-visible,[data-slot=select-trigger]:focus-visible{outline:2px solid var(--ring);outline-offset:1px;box-shadow:none}
-[data-slot=input][aria-invalid=true],[data-slot=textarea][aria-invalid=true]{border-color:var(--destructive)}
+[data-slot=input],[data-slot=textarea],[data-slot=select-trigger],.picker,[data-slot=checkbox]:not([data-state=checked]):not([data-state=indeterminate]){border-color:var(--field-border)}
+[data-slot=input]:focus-visible,[data-slot=textarea]:focus-visible,[data-slot=select-trigger]:focus-visible,.picker:focus-visible{outline:2px solid var(--ring);outline-offset:1px;box-shadow:none}
+[data-slot=input][aria-invalid=true],[data-slot=textarea][aria-invalid=true],[data-slot=select-trigger][aria-invalid=true],.picker[aria-invalid=true]{border-color:var(--destructive)}
 /* Audit: small controls get a larger hit area without changing their look. */
 .tip-btn,.icon-btn,.text-btn{position:relative}
-.tip-btn::after,.icon-btn::after,[data-slot=dialog-close]::after{content:"";position:absolute;inset:-10px}
+.tip-btn::after{content:"";position:absolute;inset:-6px}
+.icon-btn::after{content:"";position:absolute;inset:-6px -1px}
+[data-slot=dialog-close]::after{content:"";position:absolute;inset:-10px}
+.review-row [data-slot=checkbox]{position:relative}
+.review-row [data-slot=checkbox]::after{content:"";position:absolute;inset:-12px}
 .text-btn::after{content:"";position:absolute;inset:-8px -4px}
 @media (max-width:760px){
  .field input,.field textarea,[data-slot=input],[data-slot=textarea]{font-size:16px}
  .history-row summary{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}
  .history-row summary .truncate{grid-column:1/-1;grid-row:2}
- .history-row summary .case-name{white-space:normal;overflow-wrap:anywhere}
+ .history-row summary .case-name{white-space:normal;overflow-wrap:break-word}
 }
 /* Reduced motion: keep the fade, drop the zoom and slide, stop the spinner. */
 @media (prefers-reduced-motion:reduce){
- [data-slot=dialog-content],[data-slot=popover-content],[data-slot=select-content],[data-slot=dropdown-menu-content]{--tw-enter-scale:1;--tw-exit-scale:1;--tw-enter-translate-x:0;--tw-enter-translate-y:0;--tw-exit-translate-x:0;--tw-exit-translate-y:0}
+ [data-slot=dialog-content],[data-slot=popover-content],[data-slot=select-content],[data-slot=sheet-content],[data-slot=tooltip-content]{--tw-enter-scale:1;--tw-exit-scale:1;--tw-enter-translate-x:0;--tw-enter-translate-y:0;--tw-exit-translate-x:0;--tw-exit-translate-y:0}
  .spin{animation:none}
  details>summary svg,.more summary::before{transition:none}
 }
