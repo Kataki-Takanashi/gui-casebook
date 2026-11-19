@@ -53,7 +53,7 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
+  position = "popper",
   align = "center",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
@@ -124,7 +124,7 @@ function SelectItem({
         </SelectPrimitive.ItemIndicator>
       </span>
       {hint ? (
-        <span className="flex flex-col items-start gap-0.5">
+        <span className="!flex !flex-col !items-start gap-0.5 text-left">
           <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
           <span className="text-xs text-muted-foreground whitespace-normal">{hint}</span>
         </span>

@@ -8308,7 +8308,7 @@ async function handle(request) {
       if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload before saving; your form stays open." }, 409);
       const { sheet, row, values } = body;
       if (!values || typeof values !== "object") throw Error("Entry fields are missing.");
-      const saved = await saveEntry(b, owner, sheet, row, values);
+      const saved = await saveEntry(b, owner, sheet, row, values, body.source === "restore" ? "restore" : void 0);
       const kimai = sheet === "Session Ledger" ? await afterSessionSave(b, values.A, !!body.kimai) : void 0;
       return json({ ...saved, kimai });
     }

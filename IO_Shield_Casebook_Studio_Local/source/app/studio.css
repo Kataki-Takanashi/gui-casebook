@@ -205,3 +205,29 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .clip{display:block;width:100%;aspect-ratio:16/10;background:var(--muted);border:1px solid var(--border);border-radius:8px;margin-top:8px}
 .help-tabs{display:flex;flex-wrap:wrap;gap:6px}
 @media(max-width:760px){.review-row,.map-row{grid-template-columns:1fr}}
+
+/* Round 2 fixes */
+.entry-dialog [data-slot=dialog-header]{text-align:left}
+.entry-scroll,.form-rows,.form-row,.form-grid,.field{min-width:0}
+.field input[type=time]{min-width:0;width:100%}
+.dark input[type=time]::-webkit-calendar-picker-indicator,.dark input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.8)}
+.title-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.title-row h1{margin:0}
+.case-head .meta-line{margin-top:6px}
+.meta-line .mono{margin-right:4px}
+.head-actions{margin-left:auto;display:flex;gap:8px}
+.review-group{margin-bottom:14px}
+.review-group-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 6px;font-size:13px;font-weight:550}
+.check{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.review-row.selectable{grid-template-columns:auto minmax(0,1fr) minmax(0,200px) auto}
+.dialog-actions .discard-q{margin-right:auto;font-size:14px;font-weight:550}
+.dialog-actions .discard-yes{color:var(--destructive)}
+.dialog-actions .save-note{margin-right:auto;font-size:13px;color:var(--muted-foreground)}
+.dialog-actions .delete-btn+.save-note{margin-right:0}
+.history-row summary{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto auto}
+@media(max-width:760px){
+ .review-row.selectable{grid-template-columns:auto minmax(0,1fr)}
+ .review-row.selectable>:nth-child(n+3){grid-column:2}
+ .dialog-actions{flex-wrap:wrap}
+}
+.choice-menu{width:var(--radix-select-trigger-width);min-width:max(var(--radix-select-trigger-width),240px);max-width:min(420px,92vw)}

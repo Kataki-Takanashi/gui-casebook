@@ -208,7 +208,7 @@ async function handle(request:Request){try{
  if(path[2]==='entries'&&method==='PUT'){
   if(+(request.headers.get('content-length')??0)>100000)throw Error('Entry is too large.');const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload before saving; your form stays open.'},409);
   const {sheet,row,values}=body;if(!values||typeof values!=='object')throw Error('Entry fields are missing.');
-  const saved=await saveEntry(b,owner,sheet,row,values);
+  const saved=await saveEntry(b,owner,sheet,row,values,body.source==='restore'?'restore':undefined);
   const kimai=sheet==='Session Ledger'?await afterSessionSave(b,values.A,!!body.kimai):undefined;
   return json({...saved,kimai});
  }
