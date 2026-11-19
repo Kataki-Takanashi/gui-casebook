@@ -63,7 +63,7 @@ h2{font-size:15px;font-weight:600}
 .case-row.with-action{grid-template-columns:118px minmax(0,1fr) minmax(0,200px) auto auto 28px;cursor:pointer}
 button.case-name{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}
 .row-action{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;color:var(--primary);opacity:0}
-.row-action{opacity:.35}
+.row-action{opacity:.75}
 .case-row:hover .row-action,.row-action:focus-visible{opacity:1}
 .row-action:hover{background:var(--accent)}
 button.case-row:hover,div.case-row:hover{background:var(--muted)}
@@ -71,15 +71,13 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .case-name{font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 .case-name.link:hover{text-decoration:underline}
 .badge{justify-self:start;display:inline-flex;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--muted);color:var(--muted-foreground);white-space:nowrap}
-.badge.ok{background:#e3f3ee;color:#11634f}
+.badge.ok{background:var(--success-bg);color:var(--success)}
 /* Proof strength reads at a glance: T1 strongest, T4/T5 weakest. Review states keep the plain pill. */
 .badge.tclass{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;border-radius:5px;padding:1px 6px}
 .badge.tclass.T1{background:var(--accent);color:var(--accent-foreground);font-weight:600}
 .badge.tclass.T2,.badge.tclass.T3{background:var(--muted);color:var(--foreground)}
 .badge.tclass.T4,.badge.tclass.T5{background:transparent;color:var(--muted-foreground);box-shadow:inset 0 0 0 1px var(--input)}
 .row-marks{display:inline-flex;align-items:center;gap:8px;color:var(--primary)}
-.dark .badge.ok{background:#173a30;color:#7fd6b6}
-.dark .error-banner,.dark .form-error{background:#3a1a20;border-color:#6b2a35;color:#ffb3bd}
 .theme-btn{margin:auto 8px 12px;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--muted-foreground)}
 [data-collapsible=icon] .brand strong{display:none}
 [data-collapsible=icon] .brand{justify-content:center;padding:0}
@@ -99,7 +97,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .import p{color:var(--muted-foreground)}
 
 /* Alerts */
-.error-banner,.form-error{background:#fdf0f1;border:1px solid #f0c5cb;color:#8b233a;padding:10px 14px;border-radius:7px;font-size:14px;margin-bottom:16px}
+.error-banner,.form-error{background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger);padding:10px 14px;border-radius:7px;font-size:14px;margin-bottom:16px}
 .error-banner{display:flex;align-items:center;justify-content:space-between;gap:16px}
 
 /* Entry dialog */
@@ -150,8 +148,9 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .confirm-label{display:flex;align-items:center;gap:10px;font-size:14px}
 
 /* History */
-.history-row{border-top:1px solid var(--border)}
-.list>.history-row:first-child{border-top:0}
+.history-item{position:relative;border-top:1px solid var(--border)}
+.list>.history-item:first-child{border-top:0}
+.history-item>.history-undo{position:absolute;top:8px;right:12px;min-height:28px;padding:0 6px}
 .history-row summary{display:grid;gap:16px;padding:11px 16px;font-size:14px;cursor:pointer;list-style:none}
 .history-row summary:hover{background:var(--muted)}
 .history-row pre{font-size:12px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--muted);padding:12px 16px;margin:0}
@@ -162,7 +161,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .tip-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:999px;font-size:10px;font-weight:700;color:var(--muted-foreground);box-shadow:inset 0 0 0 1px var(--input);cursor:help}
 .tip-btn:hover{color:var(--foreground)}
 .dialog-actions .delete-btn{margin-right:auto;color:var(--destructive)}
-.armed{background:var(--destructive)!important;color:#fff!important}
+.armed{background:var(--destructive)!important;color:var(--destructive-foreground)!important}
 .head-action{margin-left:auto}
 .review-row.conflict{grid-template-columns:minmax(0,1fr) auto auto}
 .diff{font-size:13px}.diff b{font-weight:600}
@@ -236,8 +235,7 @@ details.more>summary{list-style:none;display:flex;align-items:center;gap:6px}
 details.more>summary::-webkit-details-marker{display:none}
 details.more>summary::before{content:'';width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s ease-out;margin-right:2px}
 details.more[open]>summary::before{transform:rotate(45deg)}
-.history-row summary{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto 44px}
-.history-row summary .text-btn{justify-self:end}
+.history-row summary{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;padding-right:72px}
 .kimai-dialog-actions,.dialog-actions{align-items:center}
 .dialog-actions>button.ghost-left:first-child{margin-right:auto}
 .review-group-head .text-btn,.review-group-head button{margin-left:8px}
@@ -283,10 +281,31 @@ body[data-scroll-locked]{margin-right:0!important}
 [data-slot=select-trigger]{min-width:0}
 
 /* Focus moved to the page heading on navigation is for screen readers; no ring. */
-main h1:focus{outline:none}
+.workspace h1[tabindex]:focus,.workspace h1[tabindex]:focus-visible{outline:none}
 /* A closing menu must not take clicks during its fade-out. */
 [data-slot=select-content][data-state=closed],[data-slot=popover-content][data-state=closed]{pointer-events:none}
 .clip-wrap{position:relative}
 .clip-toggle{position:absolute;right:10px;bottom:10px;display:grid;place-items:center;width:32px;height:32px;border-radius:999px;background:color-mix(in oklab,var(--background) 85%,transparent);border:1px solid var(--border);color:var(--foreground)}
 .clip-toggle:hover{background:var(--background)}
 .linked-note{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-foreground);min-height:36px}
+
+/* Audit: field boundaries and focus need 3:1 against the card. */
+[data-slot=input],[data-slot=textarea],[data-slot=select-trigger],.picker{border-color:var(--field-border)}
+[data-slot=input]:focus-visible,[data-slot=textarea]:focus-visible,[data-slot=select-trigger]:focus-visible{outline:2px solid var(--ring);outline-offset:1px;box-shadow:none}
+[data-slot=input][aria-invalid=true],[data-slot=textarea][aria-invalid=true]{border-color:var(--destructive)}
+/* Audit: small controls get a larger hit area without changing their look. */
+.tip-btn,.icon-btn,.text-btn{position:relative}
+.tip-btn::after,.icon-btn::after,[data-slot=dialog-close]::after{content:"";position:absolute;inset:-10px}
+.text-btn::after{content:"";position:absolute;inset:-8px -4px}
+@media (max-width:760px){
+ .field input,.field textarea,[data-slot=input],[data-slot=textarea]{font-size:16px}
+ .history-row summary{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}
+ .history-row summary .truncate{grid-column:1/-1;grid-row:2}
+ .history-row summary .case-name{white-space:normal;overflow-wrap:anywhere}
+}
+/* Reduced motion: keep the fade, drop the zoom and slide, stop the spinner. */
+@media (prefers-reduced-motion:reduce){
+ [data-slot=dialog-content],[data-slot=popover-content],[data-slot=select-content],[data-slot=dropdown-menu-content]{--tw-enter-scale:1;--tw-exit-scale:1;--tw-enter-translate-x:0;--tw-enter-translate-y:0;--tw-exit-translate-x:0;--tw-exit-translate-y:0}
+ .spin{animation:none}
+ details>summary svg,.more summary::before{transition:none}
+}
