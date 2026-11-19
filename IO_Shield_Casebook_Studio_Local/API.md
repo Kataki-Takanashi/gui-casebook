@@ -49,6 +49,7 @@ To see the column names and current values, read the records first.
 |---|---|
 | `PUT /books/:id/entries` | `{"sheet","row","revision","values"}` to add or edit one record. Use `"row":"new"` to add at the first free row |
 | `POST /books/:id/entries/delete` | `{"sheet","row","revision"}` to clear one record |
+| `POST /books/:id/review` | `{"sheet","row","revision","status","reviewer"}` to record a reviewer decision. Skill claims: Pending Review, Verified, Verified w/ Correction, Rejected. Portfolio: Pending Review, Approved, Do Not Publish |
 | `POST /books/:id/files` | Form upload with a `file` field. Returns a `ref` to put in a proof record's column F |
 
 ## Example: log a session

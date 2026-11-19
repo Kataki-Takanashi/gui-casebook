@@ -374,3 +374,10 @@ body[data-scroll-locked]{margin-right:0!important}
 .case-row.skill-claim{grid-template-columns:118px minmax(140px,2fr) minmax(0,1fr) 7rem auto auto}
 @media(max-width:760px){.case-row.skill-claim{grid-template-columns:minmax(0,1fr) auto auto}}
 @media(max-width:760px){.skill-head{row-gap:4px}}
+.reviewer-name{display:flex;align-items:center;gap:8px;font-size:13px}.reviewer-name input{width:180px}
+.review-item{display:grid;grid-template-columns:minmax(140px,1.4fr) minmax(0,2fr) auto auto;gap:16px;align-items:center;padding:12px 16px;border-top:1px solid var(--border);font-size:14px}
+.list>.review-item:first-child{border-top:0}
+.review-item>.muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.review-actions{display:flex;gap:4px}
+.review-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.review-filters>*{width:auto;min-width:160px}
+@media(max-width:760px){.review-item{grid-template-columns:minmax(0,1fr) auto}.review-item>.muted{grid-column:1/-1}.review-actions{grid-column:1/-1}.reviewer-name input{width:100%}}

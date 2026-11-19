@@ -8039,6 +8039,31 @@ async function saveEntry(b, owner, sheet, row, values, source) {
   b.updated = timestamp;
   return { revision, edits, updated: timestamp };
 }
+var REVIEW = {
+  "Competency Evidence": { statuses: ["Pending Review", "Verified", "Verified w/ Correction", "Rejected"], status: "N", reviewer: "O", date: "P" },
+  "Portfolio": { statuses: ["Pending Review", "Approved", "Do Not Publish"], status: "J", reviewer: "K" }
+};
+async function reviewEntry(b, owner, sheet, row, status, reviewer) {
+  const cfg = REVIEW[sheet];
+  if (!cfg) throw Error("Only skill claims and portfolio stories are reviewed here.");
+  if (!cfg.statuses.includes(status)) throw Error("Choose a review status.");
+  const data = JSON.parse(b.parsed), edits = JSON.parse(b.edits), current = rowsFor(data, edits, sheet).find((r) => r.row === row);
+  if (!current) throw Error("That record is not in this casebook.");
+  const pending = status === "Pending Review", patch = { [cfg.status]: status, [cfg.reviewer]: pending ? "" : String(reviewer ?? "").slice(0, 80) };
+  if (cfg.date) patch[cfg.date] = pending ? "" : (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  edits[sheet] ??= {};
+  edits[sheet][row] = { ...edits[sheet][row], ...patch };
+  const timestamp = now(), revision = b.revision + 1;
+  const results = await db().batch([
+    db().prepare("UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?").bind(JSON.stringify(edits), timestamp, b.id, owner, b.revision),
+    db().prepare("INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(), b.id, owner, revision, JSON.stringify({ sheet, row, before: current.values, after: patch, cascades: [], source: "review" }), timestamp)
+  ]);
+  if (results[0].meta.changes !== 1) throw json({ error: "This casebook changed in another window. Reload the page, then try again." }, 409);
+  b.revision = revision;
+  b.edits = JSON.stringify(edits);
+  b.updated = timestamp;
+  return { revision, edits, updated: timestamp };
+}
 async function deleteEntry(b, owner, sheet, row, source) {
   const data = JSON.parse(b.parsed), edits = JSON.parse(b.edits);
   if (!editable[sheet] || !data.sheets[sheet]) throw Error("Unsupported sheet.");
@@ -8438,6 +8463,11 @@ async function handle(request) {
         removed++;
       }
       return json({ removed });
+    }
+    if (path3[2] === "review" && method === "POST") {
+      const body = await request.json();
+      if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload the page, then try again." }, 409);
+      return json(await reviewEntry(b, owner, body.sheet, +body.row, String(body.status), String(body.reviewer ?? "")));
     }
     if (path3[2] === "records" && path3[3] && method === "GET") {
       const sheet = decodeURIComponent(path3[3]);

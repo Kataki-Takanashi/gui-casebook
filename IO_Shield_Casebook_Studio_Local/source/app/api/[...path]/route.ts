@@ -34,6 +34,23 @@ async function saveEntry(b:any,owner:string,sheet:string,row:number,values:Recor
  return {revision,edits,updated:timestamp};
 }
 
+// Reviewer decision on a skill claim or portfolio story: only the review columns change, and it is logged (and undoable) like any edit.
+const REVIEW:Record<string,{statuses:string[],status:string,reviewer:string,date?:string}>={
+ 'Competency Evidence':{statuses:['Pending Review','Verified','Verified w/ Correction','Rejected'],status:'N',reviewer:'O',date:'P'},
+ 'Portfolio':{statuses:['Pending Review','Approved','Do Not Publish'],status:'J',reviewer:'K'},
+};
+async function reviewEntry(b:any,owner:string,sheet:string,row:number,status:string,reviewer:string){
+ const cfg=REVIEW[sheet];if(!cfg)throw Error('Only skill claims and portfolio stories are reviewed here.');if(!cfg.statuses.includes(status))throw Error('Choose a review status.');
+ const data=JSON.parse(b.parsed),edits=JSON.parse(b.edits),current=rowsFor(data,edits,sheet).find((r:any)=>r.row===row);if(!current)throw Error('That record is not in this casebook.');
+ const pending=status==='Pending Review',patch:any={[cfg.status]:status,[cfg.reviewer]:pending?'':String(reviewer??'').slice(0,80)};if(cfg.date)patch[cfg.date]=pending?'':new Date().toISOString().slice(0,10);
+ edits[sheet]??={};edits[sheet][row]={...edits[sheet][row],...patch};
+ const timestamp=now(),revision=b.revision+1;
+ const results=await db().batch([
+  db().prepare('UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?').bind(JSON.stringify(edits),timestamp,b.id,owner,b.revision),
+  db().prepare('INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1').bind(crypto.randomUUID(),b.id,owner,revision,JSON.stringify({sheet,row,before:current.values,after:patch,cascades:[],source:'review'}),timestamp),
+ ]);if(results[0].meta.changes!==1)throw json({error:'This casebook changed in another window. Reload the page, then try again.'},409);
+ b.revision=revision;b.edits=JSON.stringify(edits);b.updated=timestamp;return {revision,edits,updated:timestamp};
+}
 // Clears a row (the record disappears from the app and the export). History keeps the old values, so it can be restored.
 async function deleteEntry(b:any,owner:string,sheet:string,row:number,source?:string){
  const data=JSON.parse(b.parsed),edits=JSON.parse(b.edits);
@@ -252,6 +269,7 @@ async function handle(request:Request){try{
  if(path[2]==='files'&&path[3]==='forget'&&method==='POST'){const body:any=await request.json(),proofRows=rowsFor(JSON.parse(b.parsed),JSON.parse(b.edits),'Evidence Index');let removed=0;
   for(const id of (body.ids??[]).map(String).slice(0,50)){if(proofRows.some((r:any)=>(r.values.F??'').includes(id)))continue;const f=await db().prepare('SELECT object_key FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).first();if(!f)continue;await bucket().delete(f.object_key);await db().prepare('DELETE FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).run();removed++;}
   return json({removed});}
+ if(path[2]==='review'&&method==='POST'){const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload the page, then try again.'},409);return json(await reviewEntry(b,owner,body.sheet,+body.row,String(body.status),String(body.reviewer??'')));}
  // Read one sheet's records with app edits applied, for scripts.
  if(path[2]==='records'&&path[3]&&method==='GET'){const sheet=decodeURIComponent(path[3]);if(!data.sheets[sheet])throw Error('Unknown sheet.');return json({sheet,revision:b.revision,records:rowsFor(data,edits,sheet)});}
  if(path[2]==='history'&&method==='GET'){const r=await db().prepare('SELECT revision,detail,created FROM casebook_events WHERE book_id=? ORDER BY revision DESC LIMIT 100').bind(b.id).all();return json(r.results);}
