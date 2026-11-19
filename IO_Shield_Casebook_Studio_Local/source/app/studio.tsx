@@ -83,7 +83,7 @@ export default function Studio({displayName}:{displayName:string}){
  const [form,setForm]=useState<Form|null>(null),[values,setValues]=useState<Record<string,string>>({}),[pending,setPending]=useState<PendingFile[]>([]),[formError,setFormError]=useState(''),[saving,setSaving]=useState(false),[history,setHistory]=useState<any[]>([]),[portfolio,setPortfolio]=useState<Row|null>(null),[publicCheck,setPublicCheck]=useState(false),[dragging,setDragging]=useState(false);
  type Kimai={connected:boolean,url:string,user:string|null};type KCatalog={projects:{id:number,name:string}[],activities:{id:number,name:string,project:number|null}[]};
  const [kimai,setKimai]=useState<Kimai|null>(null),[kstatus,setKstatus]=useState<any>(null),[kcatalog,setKcatalog]=useState<KCatalog|null>(null),[kimaiView,setKimaiView]=useState<''|'connect'|'review'>(''),[ksyncing,setKsyncing]=useState(false),[kchoice,setKchoice]=useState(''),[kpick,setKpick]=useState<Record<number,string>>({});
- const [initial,setInitial]=useState(''),[confirmDiscard,setConfirmDiscard]=useState(false),[confirmKimai,setConfirmKimai]=useState(false),[fieldErrors,setFieldErrors]=useState<Record<string,string>>({}),[conflict,setConflict]=useState<{fields:string[],theirs:Record<string,string>}|null>(null),[timer,setTimer]=useState<{start:string|null,case:string|null}>({start:null,case:null}),[tick,setTick]=useState(0),[lim,setLim]=useState<any>({fileMb:10,totalMb:40,files:100}),[limOpen,setLimOpen]=useState(false),[backupsOpen,setBackupsOpen]=useState(false),[noAsk,setNoAsk]=useState(false),[kTouched,setKTouched]=useState(false);
+ const [initial,setInitial]=useState(''),[confirmDiscard,setConfirmDiscard]=useState(false),[confirmKimai,setConfirmKimai]=useState(false),[fieldErrors,setFieldErrors]=useState<Record<string,string>>({}),[conflict,setConflict]=useState<{fields:string[],theirs:Record<string,string>}|null>(null),[timer,setTimer]=useState<{start:string|null,case:string|null}>({start:null,case:null}),[tick,setTick]=useState(0),[lim,setLim]=useState<any>({fileMb:10,totalMb:40,files:100}),[limOpen,setLimOpen]=useState(false),[backupsOpen,setBackupsOpen]=useState(false),[checkOpen,setCheckOpen]=useState(false),[noAsk,setNoAsk]=useState(false),[kTouched,setKTouched]=useState(false);
  const [moreOpen,setMoreOpen]=useState(false),[errorRetry,setErrorRetry]=useState<(()=>void)|null>(null);
  const [kSel,setKSel]=useState<Record<number,boolean>>({}),[kEdit,setKEdit]=useState<Record<number,boolean>>({});
  const [menuOpen,setMenuOpen]=useState(false),[helpOpen,setHelpOpen]=useState(false),[helpClip,setHelpClip]=useState(0);
@@ -230,6 +230,32 @@ export default function Studio({displayName}:{displayName:string}){
   try{setTimer(await send('settings/timer',{start:null},'PUT'));}catch(e){toast.error((e as Error).message);return;}
   start(SESSIONS,undefined,caseId);setValues(v=>({...v,B:ymd(a),J:hm(a),K:hm(b),L:hm(a)===hm(b)?'':hoursBetween(hm(a),hm(b)),I:'T1'}));}
  async function cancelTimer(){try{setTimer(await send('settings/timer',{start:null},'PUT'));}catch(e){toast.error((e as Error).message);}}
+ // Casebook check: things that are missing or don't add up. Each item opens the record so it can be fixed.
+ type Issue={sheet:string,row:Row,text:string};
+ const issues=useMemo(()=>{if(!book)return [] as Issue[];const out:Issue[]=[],caseIds=new Set(cases.map(r=>r.values.A)),proofById=new Map(proof.map(r=>[r.values.A,r])),todayStr=today();
+  // Only things that look like record IDs; free text in the proof column is left alone.
+  const ids=(v?:string)=>(v??'').split(/[,;\n]+/).map(x=>x.trim()).filter(x=>/^[A-Za-z0-9][A-Za-z0-9._-]*-[A-Za-z0-9._-]+$/.test(x));
+  const ses=(v:any)=>`Session ${excelDate(v.B)} "${(v.D??'').slice(0,40)}"`,clm=(v:any)=>`Claim "${v.F||v.E}"`;
+  for(const [sheet,rows] of [[CASES,cases],[SESSIONS,sessions],[PROOF,proof],[CLAIMS,claims],[PORTFOLIO,stories]] as [string,Row[]][]){const seen=new Set<string>();for(const r of rows){if(r.values.A&&seen.has(r.values.A))out.push({sheet,row:r,text:`${r.values.A} is used twice.`});seen.add(r.values.A);}}
+  for(const r of cases){if(isParent(r))continue;const v=r.values;
+   if(!v.H)out.push({sheet:CASES,row:r,text:`${v.A} has no Main Domain.`});
+   if(v.G&&excelDate(v.G)<excelDate(v.F))out.push({sheet:CASES,row:r,text:`${v.A} ends before it starts.`});
+   if(!sessions.some(s=>s.values.C===v.A))out.push({sheet:CASES,row:r,text:`${v.A} has no sessions yet.`});}
+  for(const r of sessions){const v=r.values,h=+v.L;
+   if(!caseIds.has(v.C))out.push({sheet:SESSIONS,row:r,text:`${ses(v)} points to a case that isn't in this casebook.`});
+   if(['T1','T2','T3'].includes(v.I)&&!(h>0))out.push({sheet:SESSIONS,row:r,text:`${ses(v)} has no hours.`});
+   if(h>24)out.push({sheet:SESSIONS,row:r,text:`${ses(v)} has more than 24 hours.`});
+   if(v.I==='T1'&&!(clockTime(v.J)&&clockTime(v.K)))out.push({sheet:SESSIONS,row:r,text:`${ses(v)} is T1 but has no start and end time.`});
+   if(v.B&&excelDate(v.B)>todayStr)out.push({sheet:SESSIONS,row:r,text:`${ses(v)} is dated in the future.`});
+   for(const pid of ids(v.O))if(!proofById.has(pid))out.push({sheet:SESSIONS,row:r,text:`${ses(v)} lists proof ${pid}, which doesn't exist.`});}
+  for(const r of proof){const v=r.values;
+   if(!caseIds.has(v.B))out.push({sheet:PROOF,row:r,text:`${v.A} points to a case that isn't in this casebook.`});
+   if(!v.F)out.push({sheet:PROOF,row:r,text:`${v.A} has no file or link.`});}
+  for(const r of claims){const v=r.values,list=ids(v.H);
+   if(!(v.H??'').trim())out.push({sheet:CLAIMS,row:r,text:`${clm(v)} has no proof.`});
+   for(const pid of list){const pr=proofById.get(pid);if(!pr)out.push({sheet:CLAIMS,row:r,text:`${clm(v)} lists proof ${pid}, which doesn't exist.`});else if(pr.values.B!==v.B)out.push({sheet:CLAIMS,row:r,text:`${clm(v)} uses proof ${pid} from another case.`});}}
+  for(const r of stories){const v=r.values;if(v.F==='Public'&&v.G!=='Yes')out.push({sheet:PORTFOLIO,row:r,text:`Story ${v.A} is Public but not marked Cleaned Up.`});}
+  return out;},[book?.revision,book?.id]);
  const kmapFor=(caseId:string)=>kstatus?.map?.[caseId];
  // Only timed (T1) sessions go to Kimai by default; rebuilt time is added only when picked.
  const kDefault=(caseId:string,tclass:string)=>{const m=kmapFor(caseId);return m&&tclass==='T1'?`${m.project}:${m.activity}`:'';};
@@ -336,6 +362,7 @@ export default function Studio({displayName}:{displayName:string}){
    {books.length>1&&<>{books.map(b=><button key={b.id} className="menu-item" onClick={()=>openBook(b.id)}>{book?.id===b.id?<Check size={15}/>:<span className="w-[15px]"/>}<span className="truncate">{b.name}</span></button>)}<hr/></>}
    <button className="menu-item" onClick={()=>uploadRef.current?.click()}><Upload size={15}/>Import casebook</button>
    {book&&<button className="menu-item" onClick={()=>setKimaiView('connect')}><Clock size={15}/>{kimai?.connected?'Kimai':'Connect Kimai'}</button>}
+   {book&&<button className="menu-item" onClick={()=>setCheckOpen(true)}><Check size={15}/>Check casebook{issues.length>0&&<span className="muted"> · {plural(issues.length,'thing')} to look at</span>}</button>}
    <button className="menu-item" onClick={()=>setLimOpen(true)}><Paperclip size={15}/>Upload limits</button>
    <button className="menu-item" onClick={()=>setBackupsOpen(true)}><History size={15}/>Backups</button>
    {book&&<><hr/><button className="menu-item" onClick={()=>download('export')}><FileSpreadsheet size={15}/>Download Excel{unsaved>0&&<span className="muted"> · {plural(unsaved,'change')}</span>}</button><button className="menu-item" onClick={()=>download('bundle')}><FileArchive size={15}/>Download Excel + proof files</button><button className="menu-item" onClick={()=>download('original')}><FileDown size={15}/>Download the file you imported</button></>}
@@ -379,6 +406,7 @@ export default function Studio({displayName}:{displayName:string}){
  {KimaiConnect()}
  {LimitsDialog()}
  {BackupsDialog()}
+ {CheckDialog()}
  <Dialog open={helpOpen} onOpenChange={setHelpOpen}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog help-dialog" onEscapeKeyDown={menuEscape}><DialogHeader><DialogTitle>Help</DialogTitle><DialogDescription className="sr-only">Short clips showing how to use Casebook Studio</DialogDescription></DialogHeader><div className="help-tabs">{tutorials.map((t,i)=><button key={t.src} aria-pressed={i===helpClip} className={'chip'+(i===helpClip?' on':'')} onClick={()=>setHelpClip(i)}>{t.title}</button>)}</div><Clip key={tutorials[helpClip].src} src={tutorials[helpClip].src} label={tutorials[helpClip].steps}/><p className="sr-only">{tutorials[helpClip].steps}</p><p className="shortcuts"><span><kbd>L</kbd> Log session</span><span><kbd>N</kbd> New case</span><span><kbd>/</kbd> Search</span><span><kbd>?</kbd> Help</span><span>Click <Clock size={13} aria-label="the clock"/> on a case to log a session</span></p></DialogContent></Dialog>
  {KimaiReview()}
  </SidebarProvider>;
@@ -413,6 +441,12 @@ export default function Studio({displayName}:{displayName:string}){
     {info&&<details className="more"><summary>How to go back to a backup</summary><ol className="steps"><li>Close Casebook Studio.</li><li>Open <span className="mono">{info.folder}</span> and pick a day.</li><li>Copy that day's <span className="mono">casebooks.sqlite</span> and <span className="mono">objects</span> folder into the data folder one level up, replacing what is there.</li><li>Start Casebook Studio again.</li></ol></details>}
    </div>
    <div className="dialog-actions"><Button variant="ghost" onClick={()=>setBackupsOpen(false)}>Close</Button><Button className="primary-button" onClick={now} disabled={busyB}>{busyB?'Backing up…':'Back up now'}</Button></div></DialogContent></Dialog>;
+ }
+ function CheckDialog(){
+  const groups:[string,string][]=[[CASES,'Cases'],[SESSIONS,'Sessions'],[PROOF,'Proof'],[CLAIMS,'Skill claims'],[PORTFOLIO,'Portfolio']];
+  return <Dialog open={checkOpen} onOpenChange={setCheckOpen}><DialogContent onCloseAutoFocus={returnFocus} className="entry-dialog" onEscapeKeyDown={menuEscape}><DialogHeader><DialogTitle>Check casebook</DialogTitle><DialogDescription className="sr-only">Things that are missing or don't add up</DialogDescription></DialogHeader>
+   <div className="entry-scroll">{issues.length===0?<div className="empty"><p>Nothing to fix. Everything adds up.</p></div>:groups.map(([sheet,title])=>{const mine=issues.filter(i=>i.sheet===sheet);return mine.length?<section key={sheet} className="group"><div className="group-head"><h2>{title}</h2><span className="muted">{mine.length}</span></div><div className="list">{mine.map((i,n)=><button key={n} className="case-row check-row" onClick={()=>{setCheckOpen(false);if(sheet===CASES)goCase(i.row.values.A);else start(sheet,i.row);}}><span className="case-name">{i.text}</span><span className="text-btn">Open</span></button>)}</div></section>:null;})}</div>
+   <div className="dialog-actions"><Button variant="ghost" onClick={()=>setCheckOpen(false)}>Close</Button></div></DialogContent></Dialog>;
  }
  function KimaiConnect(){
   const [url,setUrl]=useState(kimai?.url??'https://clock.ioshield.io'),[token,setToken]=useState(''),[busyK,setBusyK]=useState(false),[err,setErr]=useState('');

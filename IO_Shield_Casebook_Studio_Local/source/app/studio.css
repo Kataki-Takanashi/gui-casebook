@@ -363,3 +363,5 @@ body[data-scroll-locked]{margin-right:0!important}
 .timer-dot{width:8px;height:8px;border-radius:999px;background:var(--destructive)}
 .backup-row{grid-template-columns:minmax(0,1fr) auto}
 .steps{margin:8px 0 0 20px;list-style:decimal;font-size:14px;display:grid;gap:4px}
+.case-row.check-row{grid-template-columns:minmax(0,1fr) auto}
+.check-row .case-name{white-space:normal;font-weight:400}
