@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {GET,POST,PUT} from '../app/api/[...path]/route.ts';
-import {appRoot,dataRoot,closeStorage} from './storage.mjs';
+import {appRoot,dataRoot,closeStorage,backup,listBackups} from './storage.mjs';
 const [major,minor]=process.versions.node.split('.').map(Number);if(major<22||major===22&&minor<13)throw Error('Install Node.js 22.13 or newer to run Casebook Studio.');
 const port=Number(process.env.CASEBOOK_PORT||8765);
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('CASEBOOK_PORT must be between 1024 and 65535.');
@@ -18,6 +18,10 @@ async function respond(req,res){
   if(req.headers.origin&&req.headers.origin!==here||req.headers['sec-fetch-site']==='cross-site'){res.writeHead(403,security);return res.end('Cross-site requests are blocked.');}
   const url=new URL(req.url,here);
   if(url.pathname==='/health'){res.writeHead(200,{'Content-Type':'application/json',...security});return res.end(JSON.stringify({app:'Casebook Studio Local',version:'0.1.1',local:true}));}
+  if(url.pathname==='/api/backups'){
+   if(req.method==='POST'){try{backup(true);}catch(e){res.writeHead(500,{'Content-Type':'application/json',...security});return res.end(JSON.stringify({error:'Backup failed: '+e.message}));}}
+   res.writeHead(200,{'Content-Type':'application/json',...security});return res.end(JSON.stringify({folder:path.join(dataRoot,'backups'),backups:listBackups()}));
+  }
   if(url.pathname.startsWith('/api/')){
    const handler={GET,POST,PUT}[req.method];if(!handler){res.writeHead(405,security);return res.end('Method not allowed.');}
    let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>210*1024*1024){res.writeHead(413,security);return res.end('That file is over 200 MB.');}chunks.push(chunk);}
@@ -39,7 +43,9 @@ async function respond(req,res){
 // Writes run one at a time (the revision check relies on it); reads and page files don't wait behind a slow Kimai call.
 const server=http.createServer((req,res)=>{if(req.method==='GET'||req.method==='HEAD'){respond(req,res).catch(e=>console.error(e));return;}queue=queue.then(()=>respond(req,res)).catch(e=>console.error(e));});
 server.on('error',e=>{if(e.code==='EADDRINUSE')console.error('Port '+port+' is in use. Another Casebook Studio window may already be running.');else console.error(e);process.exitCode=1;closeStorage();});
-server.listen(port,'127.0.0.1',()=>{
+// Back up once a day: at start, and every hour after that if the day has changed.
+const dailyBackup=()=>{try{backup();}catch(e){console.error('Backup failed:',e.message);}};setInterval(dailyBackup,3600000).unref();
+server.listen(port,'127.0.0.1',()=>{dailyBackup();
  console.log('\nI/O Shield Casebook Studio · LOCAL 0.1.1\n\nOpen: '+origin+'\nData: '+dataRoot+'\n\nKeep this window open. Press Ctrl+C to stop.\n');
  if(process.argv.includes('--open')){const cmd=process.platform==='win32'?['cmd',['/c','start','',origin]]:process.platform==='darwin'?['open',[origin]]:['xdg-open',[origin]];const child=spawn(cmd[0],cmd[1],{stdio:'ignore',detached:true});child.on('error',()=>{});child.unref();}
 });

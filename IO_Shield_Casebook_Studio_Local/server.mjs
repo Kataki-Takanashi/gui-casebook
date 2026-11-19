@@ -6593,6 +6593,43 @@ var env = { DB: { prepare: prepared, async batch(statements) {
 function closeStorage() {
   database.close();
 }
+var backupRoot = path.join(dataRoot, "backups");
+var KEEP = 14;
+var today = () => {
+  const d = /* @__PURE__ */ new Date(), p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+function linkTree(from, to) {
+  if (!fs.existsSync(from)) return;
+  fs.mkdirSync(to, { recursive: true });
+  for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+    const a = path.join(from, e.name), b = path.join(to, e.name);
+    if (e.isDirectory()) linkTree(a, b);
+    else if (!e.name.endsWith(".tmp") && !fs.existsSync(b)) {
+      try {
+        fs.linkSync(a, b);
+      } catch {
+        fs.copyFileSync(a, b);
+      }
+    }
+  }
+}
+function listBackups() {
+  if (!fs.existsSync(backupRoot)) return [];
+  return fs.readdirSync(backupRoot).filter((n) => /^\d{4}-\d{2}-\d{2}$/.test(n) && fs.existsSync(path.join(backupRoot, n, "casebooks.sqlite"))).sort().reverse();
+}
+function backup(force = false) {
+  const name = today(), dir = path.join(backupRoot, name), db2 = path.join(dir, "casebooks.sqlite");
+  if (fs.existsSync(db2) && !force) return name;
+  fs.mkdirSync(dir, { recursive: true });
+  const temp = db2 + ".tmp";
+  fs.rmSync(temp, { force: true });
+  database.exec(`VACUUM INTO '${temp.replaceAll("'", "''")}'`);
+  fs.renameSync(temp, db2);
+  linkTree(path.join(dataRoot, "objects"), path.join(dir, "objects"));
+  for (const old of listBackups().slice(KEEP)) fs.rmSync(path.join(backupRoot, old), { recursive: true, force: true });
+  return name;
+}
 
 // server/local-auth.mjs
 async function getChatGPTUser() {
@@ -8464,6 +8501,18 @@ async function respond(req, res) {
       res.writeHead(200, { "Content-Type": "application/json", ...security });
       return res.end(JSON.stringify({ app: "Casebook Studio Local", version: "0.1.1", local: true }));
     }
+    if (url.pathname === "/api/backups") {
+      if (req.method === "POST") {
+        try {
+          backup(true);
+        } catch (e) {
+          res.writeHead(500, { "Content-Type": "application/json", ...security });
+          return res.end(JSON.stringify({ error: "Backup failed: " + e.message }));
+        }
+      }
+      res.writeHead(200, { "Content-Type": "application/json", ...security });
+      return res.end(JSON.stringify({ folder: path2.join(dataRoot, "backups"), backups: listBackups() }));
+    }
     if (url.pathname.startsWith("/api/")) {
       const handler = { GET, POST, PUT }[req.method];
       if (!handler) {
@@ -8528,7 +8577,16 @@ server.on("error", (e) => {
   process.exitCode = 1;
   closeStorage();
 });
+var dailyBackup = () => {
+  try {
+    backup();
+  } catch (e) {
+    console.error("Backup failed:", e.message);
+  }
+};
+setInterval(dailyBackup, 36e5).unref();
 server.listen(port, "127.0.0.1", () => {
+  dailyBackup();
   console.log("\nI/O Shield Casebook Studio \xB7 LOCAL 0.1.1\n\nOpen: " + origin + "\nData: " + dataRoot + "\n\nKeep this window open. Press Ctrl+C to stop.\n");
   if (process.argv.includes("--open")) {
     const cmd = process.platform === "win32" ? ["cmd", ["/c", "start", "", origin]] : process.platform === "darwin" ? ["open", [origin]] : ["xdg-open", [origin]];

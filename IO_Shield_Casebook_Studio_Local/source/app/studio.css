@@ -361,3 +361,5 @@ body[data-scroll-locked]{margin-right:0!important}
 .noask{font-size:13px;color:var(--muted-foreground);gap:6px}
 .timer-run{gap:6px;font-variant-numeric:tabular-nums}
 .timer-dot{width:8px;height:8px;border-radius:999px;background:var(--destructive)}
+.backup-row{grid-template-columns:minmax(0,1fr) auto}
+.steps{margin:8px 0 0 20px;list-style:decimal;font-size:14px;display:grid;gap:4px}
