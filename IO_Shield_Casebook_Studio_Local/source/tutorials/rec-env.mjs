@@ -51,7 +51,7 @@ async function seedCases(){
   await page.getByRole('combobox',{name:'Main Domain'}).click();await page.getByRole('option').filter({hasText:'Networking'}).first().click();
   if(parent){await page.getByRole('combobox',{name:'Parent project'}).click();await page.getByRole('option').filter({hasText:parent}).first().click();}
   await page.getByLabel('What I Did').fill(did);
-  await page.getByLabel('Scope / Permission').fill('Own lab equipment');
+  await page.getByRole('textbox',{name:'Scope / Permission'}).fill('Own lab equipment');
   await page.getByRole('button',{name:'Save',exact:true}).click();
   await page.locator('[role=dialog].entry-dialog').first().waitFor({state:'detached'});
  };

@@ -6,9 +6,9 @@ const browser=await chromium.launch({channel:'chrome',headless:true});
 const page=await (await browser.newContext({viewport:{width:1280,height:800}})).newPage();
 const results=[];
 const check=(name,ok,detail='')=>{results.push({name,ok});console.log(`${ok?'PASS':'FAIL'}  ${name}${detail?'  '+detail:''}`);};
-const dialogOpen=()=>page.locator('[role=dialog]').count().then(n=>n>0);
+const dialogOpen=()=>page.locator('[role=dialog].entry-dialog').count().then(n=>n>0);
 const pageLocked=()=>page.evaluate(()=>document.body.style.pointerEvents==='none');
-async function openLogSession(){await page.getByRole('button',{name:/^Log session/}).first().click();await page.locator('[role=dialog]').waitFor();}
+async function openLogSession(){await page.getByRole('button',{name:/^Log session/}).first().click();await page.locator('[role=dialog].entry-dialog').waitFor();}
 try{
  await page.goto(BASE);await page.getByRole('heading',{name:'Cases'}).waitFor();
 
@@ -39,6 +39,14 @@ try{
  await page.getByRole('button',{name:'Cancel'}).click();await page.getByRole('button',{name:'Discard'}).click();await page.waitForTimeout(500);
  check('Discard closes the form',!(await dialogOpen()));
  check('Page is clickable after discarding',!(await pageLocked()));
+ // Escape on a dropdown inside the Kimai dialog (if Kimai is connected) closes only the dropdown.
+ const mapSelect=async()=>{await page.getByRole('button',{name:'Casebook menu'}).click();await page.locator('.menu-item').filter({hasText:'Kimai'}).click();await page.locator('[role=dialog].entry-dialog').waitFor();return page.getByRole('combobox',{name:/Kimai activity for/}).first();};
+ const sel=await mapSelect();
+ if(await sel.count()){await sel.click();await page.locator('[data-slot=select-content]').waitFor();await page.keyboard.press('Escape');await page.waitForTimeout(400);
+  check('Escape in the Kimai dialog keeps it open',await dialogOpen());
+  await page.keyboard.press('Escape');await page.waitForTimeout(500);
+  check('Kimai dialog closes cleanly',!(await dialogOpen())&&!(await pageLocked()));}
+ else{await page.keyboard.press('Escape');console.log('SKIP  Kimai dialog checks (Kimai not connected)');}
 }catch(e){check('UI checks ran',false,e.message.split('\n')[0]);}
 finally{await browser.close();}
 const failed=results.filter(r=>!r.ok).length;

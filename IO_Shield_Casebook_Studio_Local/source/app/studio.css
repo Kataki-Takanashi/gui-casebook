@@ -152,7 +152,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 /* History */
 .history-row{border-top:1px solid var(--border)}
 .list>.history-row:first-child{border-top:0}
-.history-row summary{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:16px;padding:11px 16px;font-size:14px;cursor:pointer;list-style:none}
+.history-row summary{display:grid;gap:16px;padding:11px 16px;font-size:14px;cursor:pointer;list-style:none}
 .history-row summary:hover{background:var(--muted)}
 .history-row pre{font-size:12px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--muted);padding:12px 16px;margin:0}
 
@@ -223,7 +223,6 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .dialog-actions .discard-yes{color:var(--destructive)}
 .dialog-actions .save-note{margin-right:auto;font-size:13px;color:var(--muted-foreground)}
 .dialog-actions .delete-btn+.save-note{margin-right:0}
-.history-row summary{grid-template-columns:minmax(0,auto) minmax(0,1fr) auto auto}
 @media(max-width:760px){
  .review-row.selectable{grid-template-columns:auto minmax(0,1fr)}
  .review-row.selectable>:nth-child(n+3){grid-column:2}
@@ -258,3 +257,11 @@ kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;paddi
 }
 .narrow-only{display:none}
 @media(max-width:760px){.wide-only{display:none}.narrow-only{display:inline}}
+
+/* Round 4 fixes */
+.more summary{width:auto;max-width:100%;overflow:hidden}
+.more summary .muted{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.review-dialog .entry-scroll{padding-bottom:0}
+.sticky-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px;margin-top:8px;background:var(--popover);border-top:1px solid var(--border)}
+.primary-confirm:not(:disabled):not(.armed){border-color:var(--primary);color:var(--primary)}
+[data-collapsible=icon] [data-sidebar=menu-button][data-active=true]{background:var(--accent);color:var(--accent-foreground)}
