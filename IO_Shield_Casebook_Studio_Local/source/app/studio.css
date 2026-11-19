@@ -75,7 +75,7 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .badge.tclass{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;border-radius:5px;padding:1px 6px}
 .badge.tclass.T1{background:var(--accent);color:var(--accent-foreground);font-weight:600}
 .badge.tclass.T2,.badge.tclass.T3{background:var(--muted);color:var(--foreground)}
-.badge.tclass.T4,.badge.tclass.T5{background:transparent;color:var(--muted-foreground);box-shadow:inset 0 0 0 1px var(--input)}
+.badge.tclass.T4,.badge.tclass.T5{background:transparent;color:var(--muted-foreground);box-shadow:inset 0 0 0 1px var(--field-border)}
 .row-marks{display:inline-flex;align-items:center;gap:8px;color:var(--primary)}
 .theme-btn{margin:auto 8px 12px;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;color:var(--muted-foreground)}
 [data-collapsible=icon] .brand strong{display:none}
@@ -116,7 +116,6 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .field{display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:0}
 .field>span{font-weight:500;color:var(--muted-foreground)}
 .field b{color:var(--primary);font-weight:500}
-.field .has-tip{cursor:help;text-decoration:underline dotted;text-decoration-color:var(--input);text-underline-offset:3px;width:max-content}
 .field.wide{grid-column:1/-1}
 .field input,.field textarea{font-size:15px;background:var(--card)}
 .field input{height:38px}
@@ -153,7 +152,6 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .history-row summary{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr) auto;gap:16px;padding:11px 16px;font-size:14px;cursor:pointer;list-style:none}
 .history-row summary{padding-right:72px}
 @media(hover:hover){.history-row summary:hover{background:var(--muted)}}
-.history-row pre{font-size:12px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--muted);padding:12px 16px;margin:0}
 
 /* Forms and dialogs */
 .picker-pop{width:var(--radix-popover-trigger-width);min-width:300px;max-width:min(560px,88vw)}
@@ -199,7 +197,6 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .review-row strong{font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .map-row{display:grid;grid-template-columns:118px minmax(0,1fr) minmax(0,260px);gap:12px;align-items:center;padding:8px 16px;border-top:1px solid var(--border)}
 .list>.map-row:first-child{border-top:0}
-.chip.fit{width:max-content}
 .clip{display:block;width:100%;aspect-ratio:16/10;background:var(--muted);border:1px solid var(--border);border-radius:8px;margin-top:8px}
 .help-tabs{display:flex;flex-wrap:wrap;gap:6px}
 @media(max-width:760px){.review-row,.map-row{grid-template-columns:1fr}}
@@ -212,7 +209,6 @@ button.case-name{background:none;border:0;padding:0;font:inherit;font-weight:500
 .title-row h1{margin:0}
 .case-head .meta-line{margin-top:6px}
 .meta-line .mono{margin-right:4px}
-.head-actions{margin-left:auto;display:flex;gap:8px}
 .review-group{margin-bottom:14px}
 .review-group-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 6px;font-size:13px;font-weight:500;position:sticky;top:0;z-index:2;background:var(--popover);padding:6px 2px}
 .check{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
@@ -300,8 +296,7 @@ body[data-scroll-locked]{margin-right:0!important}
 /* Reduced motion: keep the fade, drop the zoom and slide, stop the spinner. */
 @media (prefers-reduced-motion:reduce){
  [data-slot=dialog-content],[data-slot=popover-content],[data-slot=select-content],[data-slot=sheet-content],[data-slot=tooltip-content]{--tw-enter-scale:1;--tw-exit-scale:1;--tw-enter-translate-x:0;--tw-enter-translate-y:0;--tw-exit-translate-x:0;--tw-exit-translate-y:0}
- .spin{animation:none}
- details>summary svg,.more summary::before{transition:none}
+ .more summary::before{transition:none}
 }
 
 .hours-input{position:relative}
@@ -313,7 +308,6 @@ body[data-scroll-locked]{margin-right:0!important}
 /* Long unbroken titles must wrap, never widen the page. */
 .case-head>div{min-width:0}
 .case-head h1,.review-row strong,.portfolio-story{overflow-wrap:anywhere}
-.case-row>.num:nth-last-child(2),.case-row .num{font-variant-numeric:tabular-nums}
 /* Mixed-direction titles (Arabic, Hebrew) take their direction from their own text. */
 .case-name,.case-head h1,.review-row strong,.history-row .case-name{unicode-bidi:plaintext}
 
@@ -346,3 +340,19 @@ body[data-scroll-locked]{margin-right:0!important}
  .history-row summary{padding-right:16px}
  .history-item:has(>.history-undo)>.history-row summary{padding-right:64px}
 }
+
+/* Colour carries meaning only: status pills and the one Kimai state that needs a decision. */
+.badge.bad{background:var(--danger-bg);color:var(--danger)}
+.badge.warn{background:var(--warning-bg);color:var(--warning)}
+.warn-text{color:var(--warning)}
+.hours-input>.warn-text.over{color:var(--destructive)}
+/* Motion carries meaning only: quick toasts, a highlight on the row just saved, errors that fade in. */
+[data-sonner-toast]{transition-duration:180ms!important;transition-timing-function:cubic-bezier(.16,1,.3,1)!important}
+@keyframes landed{from{background:var(--accent)}}
+.case-row.landed{animation:landed 200ms ease-out 900ms both}
+@keyframes fade-in{from{opacity:0}}
+.error-banner,.form-error{animation:fade-in 150ms ease-out}
+.icon-btn:disabled{opacity:.5}
+@keyframes pulse{from{opacity:.4}}
+@media (prefers-reduced-motion:reduce){.spin{animation:pulse 1s ease-in-out infinite alternate}}
+.more[open] summary .muted{display:none}
