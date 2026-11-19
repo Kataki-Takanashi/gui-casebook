@@ -6,7 +6,7 @@
 - One primary action per screen. "Log session" is always in the top bar.
 
 ## Forms
-- Show only what a person has to decide. Anything that can be worked out goes under "Details".
+- Show only what a person has to decide. Anything that can be worked out goes under "More".
 - Infer, don't ask: IDs, hours from start/end, domains and context from the case, tools and work level from the last session, proof type from the file.
 - Values typed once become suggestions next time.
 - Files attach where the work is logged (drop, paste, or Attach). They become proof on the same case.

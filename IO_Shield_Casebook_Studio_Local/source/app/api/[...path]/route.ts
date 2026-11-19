@@ -29,7 +29,7 @@ async function saveEntry(b:any,owner:string,sheet:string,row:number,values:Recor
   const results=await db().batch([
    db().prepare('UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?').bind(JSON.stringify(edits),timestamp,b.id,owner,b.revision),
    db().prepare('INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1').bind(crypto.randomUUID(),b.id,owner,revision,JSON.stringify({sheet,row,before:old,after:updated,cascades,...(source?{source}:{})}),timestamp),
-  ]);if(results[0].meta.changes!==1)throw json({error:'Another update arrived first. Reload before saving.'},409);
+  ]);if(results[0].meta.changes!==1)throw json({error:'This casebook changed in another window. It is up to date now, so check the form and save again.'},409);
  b.revision=revision;b.edits=JSON.stringify(edits);b.updated=timestamp;
  return {revision,edits,updated:timestamp};
 }
@@ -44,7 +44,7 @@ async function deleteEntry(b:any,owner:string,sheet:string,row:number,source?:st
  const results=await db().batch([
   db().prepare('UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?').bind(JSON.stringify(edits),timestamp,b.id,owner,b.revision),
   db().prepare('INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1').bind(crypto.randomUUID(),b.id,owner,revision,JSON.stringify({sheet,row,before:current.values,after:cleared,deleted:true,...(source?{source}:{})}),timestamp),
- ]);if(results[0].meta.changes!==1)throw json({error:'Another update arrived first. Reload before deleting.'},409);
+ ]);if(results[0].meta.changes!==1)throw json({error:'This casebook changed in another window. Reload the page, then try again.'},409);
  b.revision=revision;b.edits=JSON.stringify(edits);b.updated=timestamp;
  return {revision,edits,updated:timestamp,before:current.values};
 }
@@ -179,7 +179,7 @@ async function kimaiRoute(path:string[],method:string,request:Request,owner:stri
  if(path[3]==='resolve'&&method==='POST'){
   const link=(await links(b.id)).find(l=>l.session_id===body.session_id);if(!link)throw Error('That session is not linked to Kimai.');
   if(body.keep==='unlink'){await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,link.session_id).run();return json({ok:true});}
-  const e=await K.entry(cfg,link.kimai_id);if(!e)throw Error('That Kimai entry no longer exists.');
+  const e=await K.entry(cfg,link.kimai_id);if(!e)throw Error('That entry was deleted in Kimai. Unlink it under Removed in Kimai review.');
   const map=await caseMap(b.id),row=sessionRows(b).find((r:any)=>r.values.A===link.session_id);
   if(body.keep==='kimai'){await pullInto(b,owner,row,e);const after=sessionRows(b).find((r:any)=>r.values.A===link.session_id);await saveLink(b.id,link.session_id,e.id,appFields(after,map,K.entryFields(e))!,K.entryFields(e));}
   else{const app=appFields(row,map,link.synced.kimai)!;const u=await K.update(cfg,e.id,app);await saveLink(b.id,link.session_id,e.id,app,K.entryFields(u));}
@@ -194,9 +194,9 @@ async function handle(request:Request){try{
  if(path[0]==='books'&&!path[1]){
   if(method==='GET'){const r=await db().prepare('SELECT id,name,revision,created,updated FROM casebooks WHERE owner=? ORDER BY updated DESC').bind(owner).all();return json(r.results);}
   if(method==='POST'){
-   const count=await db().prepare('SELECT COUNT(*) AS n FROM casebooks WHERE owner=?').bind(owner).first();if(count.n>=20)throw Error('The pilot supports up to 20 casebooks per person.');
+   const count=await db().prepare('SELECT COUNT(*) AS n FROM casebooks WHERE owner=?').bind(owner).first();if(count.n>=20)throw Error('You can keep up to 20 casebooks.');
    const form=await request.formData(),file=form.get('file');if(!(file instanceof File)||!file.name.toLowerCase().endsWith('.xlsx'))throw Error('Choose a .xlsx casebook.');if(file.size>30*1024*1024)throw Error('Casebooks must be smaller than 30 MB.');
-   const bytes=new Uint8Array(await file.arrayBuffer()),data=parseWorkbook(bytes),parsed=JSON.stringify(data);if(parsed.length>8000000)throw Error('This casebook contains too much data for the pilot.');
+   const bytes=new Uint8Array(await file.arrayBuffer()),data=parseWorkbook(bytes),parsed=JSON.stringify(data);if(parsed.length>8000000)throw Error('This casebook is too large to open.');
    const id=crypto.randomUUID(),key=owner+'/'+id+'/original.xlsx',created=now();await bucket().put(key,bytes,{httpMetadata:{contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}});
    await db().prepare('INSERT INTO casebooks (id,owner,name,original_key,parsed,edits,revision,created,updated) VALUES (?,?,?,?,?,\'{}\',0,?,?)').bind(id,owner,safeName(file.name),key,parsed,created,created).run();return json({id},201);
   }
@@ -209,22 +209,22 @@ async function handle(request:Request){try{
  if(!path[2]&&method==='GET'){const fs=await db().prepare('SELECT id,name,hash,bytes,created FROM proof_files WHERE book_id=? AND owner=? ORDER BY created DESC').bind(b.id,owner).all();return json({id:b.id,name:b.name,revision:b.revision,created:b.created,updated:b.updated,data,edits,files:fs.results});}
  if(path[2]==='original'&&method==='GET'){const o=await bucket().get(b.original_key);if(!o)throw Error('Original unavailable.');return new Response(o.body,{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename="${safeName(b.name)}"`,'Cache-Control':'no-store'}});}
  if(path[2]==='entries'&&method==='PUT'){
-  if(+(request.headers.get('content-length')??0)>100000)throw Error('Entry is too large.');const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload before saving; your form stays open.'},409);
+  if(+(request.headers.get('content-length')??0)>100000)throw Error('Entry is too large.');const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. It is up to date now, so check the form and save again.'},409);
   const {sheet,row,values}=body;if(!values||typeof values!=='object')throw Error('Entry fields are missing.');
   const saved=await saveEntry(b,owner,sheet,row,values,body.source==='restore'?'restore':undefined);
   const kimai=sheet==='Session Ledger'?await afterSessionSave(b,values.A,!!body.kimai,body.kimai?.activity?{project:+body.kimai.project,activity:+body.kimai.activity}:undefined):undefined;
   return json({...saved,kimai});
  }
  if(path[2]==='entries'&&path[3]==='delete'&&method==='POST'){
-  const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload first.'},409);
+  const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload the page, then try again.'},409);
   const r=await deleteEntry(b,owner,body.sheet,+body.row);
   if(body.sheet==='Session Ledger'&&r.before.A)await db().prepare('DELETE FROM kimai_links WHERE book_id=? AND session_id=?').bind(b.id,r.before.A).run();
   return json(r);
  }
  if(path[2]==='files'&&method==='POST'){
-  const totals=await db().prepare('SELECT SUM(bytes) AS bytes,COUNT(*) AS n FROM proof_files WHERE book_id=?').bind(b.id).first(),form=await request.formData(),f=form.get('file');if(!(f instanceof File))throw Error('Choose a supporting file.');
-  if(!/\.(pdf|png|jpg|jpeg|webp|txt|md|csv|json|log|pcap|pcapng|conf|yaml|yml|docx|xlsx)$/i.test(f.name))throw Error('Use a document, image, log, configuration, or packet capture.');
-  if(f.size<=0||f.size>10*1024*1024)throw Error('Files must be nonempty and no larger than 10 MB.');if((totals.bytes??0)+f.size>40*1024*1024||totals.n>=100)throw Error('The pilot allows 100 files and 40 MB of proof per casebook.');
+  const totals=await db().prepare('SELECT SUM(bytes) AS bytes,COUNT(*) AS n FROM proof_files WHERE book_id=?').bind(b.id).first(),form=await request.formData(),f=form.get('file');if(!(f instanceof File))throw Error('Choose a file.');
+  if(!/\.(pdf|png|jpg|jpeg|webp|txt|md|csv|json|log|pcap|pcapng|conf|yaml|yml|docx|xlsx)$/i.test(f.name))throw Error(`${f.name} can't be attached. Use a PDF, image, text, log, config, Word, Excel or packet capture file.`);
+  if(f.size<=0)throw Error(`${f.name} is empty.`);if(f.size>10*1024*1024)throw Error(`${f.name} is over 10 MB.`);if((totals.bytes??0)+f.size>40*1024*1024||totals.n>=100)throw Error('A casebook can hold up to 100 proof files (40 MB in all).');
   const bytes=await f.arrayBuffer(),hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(n=>n.toString(16).padStart(2,'0')).join(''),id=crypto.randomUUID(),name=safeName(f.name),key=owner+'/'+b.id+'/proof/'+id,created=now();await bucket().put(key,bytes);
   await db().prepare('INSERT INTO proof_files (id,book_id,owner,name,object_key,hash,bytes,created) VALUES (?,?,?,?,?,?,?,?)').bind(id,b.id,owner,name,key,hash,f.size,created).run();return json({id,name,hash,bytes:f.size,created,ref:`attachments/${id}/${name}`},201);
  }

@@ -12,7 +12,7 @@ export const editable:Record<string,string[]>={
 export const required:Record<string,string[]>={'Case Register':['A','C','D','E','F','H','N','W','X'],'Session Ledger':['A','B','C','D','E','F','G','I','P'],'Evidence Index':['A','B','C','D','E','F','H'],'Competency Evidence':['A','B','C','D','E','F','G','H','J','K'],'Portfolio':['A','B','C','D','E','M']};
 export const dateColumns:Record<string,string[]>={'Case Register':['F','G','T'],'Session Ledger':['B'],'Evidence Index':['C','M'],'Competency Evidence':['C','P'],'Portfolio':['L']};
 export const numericColumns:Record<string,string[]>={'Case Register':['M'],'Session Ledger':['L','P'],'Competency Evidence':['J']};
-export const labels:Record<string,string>={'Case Register':'Case','Session Ledger':'Session','Evidence Index':'Proof','Competency Evidence':'Skill claim','Portfolio':'Portfolio draft'};
+export const labels:Record<string,string>={'Case Register':'Case','Session Ledger':'Session','Evidence Index':'Proof','Competency Evidence':'Skill claim','Portfolio':'Portfolio story'};
 export const timeNames={T1:'T1 · Exact tracked time',T2:'T2 · Reconstructed from records',T3:'T3 · Proven minimum time',T4:'T4 · Work known, hours unknown',T5:'T5 · Recollection awaiting proof'};
 export const levels=['0 · Observed','1 · Assisted','2 · Supervised','3 · Independent','4 · Lead','5 · Mentor'];
 export function rowsFor(data:BookData,edits:Edits,sheet:string):Row[]{const out=new Map((data.sheets[sheet]?.rows??[]).map(r=>[r.row,{row:r.row,values:{...r.values}}]));for(const [n,v]of Object.entries(edits[sheet]??{}))out.set(+n,{row:+n,values:{...out.get(+n)?.values,...v}});return [...out.values()].filter(r=>r.values.A).sort((a,b)=>a.row-b.row);}
@@ -25,22 +25,22 @@ export function validateEntry(data:BookData,edits:Edits,sheet:string,row:number,
  for(const col of required[sheet])if(!values[col]?.trim())throw Error(`Complete ${data.sheets[sheet].headers[col]}.`);
  const current=rowsFor(data,edits,sheet).find(r=>r.row===row);
  if(current&&current.values.A!==values.A)throw Error('Record IDs cannot be changed.');
- if(rowsFor(data,edits,sheet).some(r=>r.row!==row&&r.values.A===values.A))throw Error('This record ID already exists.');
+ if(rowsFor(data,edits,sheet).some(r=>r.row!==row&&r.values.A===values.A))throw Error('That ID is already used. Choose another.');
  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(values.A))throw Error('Use letters, numbers, periods, underscores, or hyphens in the record ID.');
  const caseId=sheet==='Session Ledger'?values.C:values.B;
- if(sheet!=='Case Register'&&!rowsFor(data,edits,'Case Register').some(r=>r.values.A===caseId))throw Error('Select a case from this casebook.');
+ if(sheet!=='Case Register'&&!rowsFor(data,edits,'Case Register').some(r=>r.values.A===caseId))throw Error('Choose a case from this casebook.');
  for(const col of dateColumns[sheet]??[])if(values[col]&&(!/^\d{4}-\d{2}-\d{2}$/.test(values[col])||new Date(values[col]+'T00:00:00Z').toISOString().slice(0,10)!==values[col]))throw Error('Enter a valid date.');
  if(sheet==='Session Ledger'){
   if(!Object.keys(timeNames).includes(values.I))throw Error('Choose a time class.');
   if(['T4','T5'].includes(values.I)&&values.L)throw Error('Leave hours blank for T4 and T5.');
-  if(['T1','T2','T3'].includes(values.I)&&(!values.L||!Number.isFinite(+values.L)||+values.L<=0||+values.L>24))throw Error('Enter proven session hours greater than 0 and no more than 24.');
+  if(['T1','T2','T3'].includes(values.I)&&(!values.L||!Number.isFinite(+values.L)||+values.L<=0||+values.L>24))throw Error('Enter hours above 0, up to 24.');
   if(!/^[0-5]$/.test(values.P))throw Error('Choose a work level.');
  }
  if(sheet==='Case Register'&&!Object.keys(timeNames).includes(values.N))throw Error('Choose a time class.');
  if(sheet==='Competency Evidence'){
   if(!/^[0-5]$/.test(values.J))throw Error('Choose a work level.');
-  const skill=data.sheets['Competency Catalog'].rows.find(r=>r.values.A===values.E);if(!skill||skill.values.C!==values.F)throw Error('Choose a skill from the uploaded catalog.');
-  const proofIds=values.H.split(/[,;\s]+/).filter(Boolean),known=rowsFor(data,edits,'Evidence Index');if(proofIds.some(id=>!known.some(r=>r.values.A===id&&r.values.B===values.B)))throw Error('Every proof ID must belong to the selected case.');
+  const skill=data.sheets['Competency Catalog'].rows.find(r=>r.values.A===values.E);if(!skill||skill.values.C!==values.F)throw Error('Choose a skill from the Competency Catalog.');
+  const proofIds=values.H.split(/[,;\s]+/).filter(Boolean),known=rowsFor(data,edits,'Evidence Index');if(proofIds.some(id=>!known.some(r=>r.values.A===id&&r.values.B===values.B)))throw Error('Choose proof from this case only.');
  }return current;
 }
 // Google Sheets exports store codes like 2 or 8 as "2.0" / "8.0"; the template uses "02" / "08".

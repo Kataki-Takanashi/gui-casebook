@@ -7645,24 +7645,24 @@ function validateEntry(data, edits, sheet, row, values) {
   for (const col of required[sheet]) if (!values[col]?.trim()) throw Error(`Complete ${data.sheets[sheet].headers[col]}.`);
   const current = rowsFor(data, edits, sheet).find((r) => r.row === row);
   if (current && current.values.A !== values.A) throw Error("Record IDs cannot be changed.");
-  if (rowsFor(data, edits, sheet).some((r) => r.row !== row && r.values.A === values.A)) throw Error("This record ID already exists.");
+  if (rowsFor(data, edits, sheet).some((r) => r.row !== row && r.values.A === values.A)) throw Error("That ID is already used. Choose another.");
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(values.A)) throw Error("Use letters, numbers, periods, underscores, or hyphens in the record ID.");
   const caseId = sheet === "Session Ledger" ? values.C : values.B;
-  if (sheet !== "Case Register" && !rowsFor(data, edits, "Case Register").some((r) => r.values.A === caseId)) throw Error("Select a case from this casebook.");
+  if (sheet !== "Case Register" && !rowsFor(data, edits, "Case Register").some((r) => r.values.A === caseId)) throw Error("Choose a case from this casebook.");
   for (const col of dateColumns[sheet] ?? []) if (values[col] && (!/^\d{4}-\d{2}-\d{2}$/.test(values[col]) || (/* @__PURE__ */ new Date(values[col] + "T00:00:00Z")).toISOString().slice(0, 10) !== values[col])) throw Error("Enter a valid date.");
   if (sheet === "Session Ledger") {
     if (!Object.keys(timeNames).includes(values.I)) throw Error("Choose a time class.");
     if (["T4", "T5"].includes(values.I) && values.L) throw Error("Leave hours blank for T4 and T5.");
-    if (["T1", "T2", "T3"].includes(values.I) && (!values.L || !Number.isFinite(+values.L) || +values.L <= 0 || +values.L > 24)) throw Error("Enter proven session hours greater than 0 and no more than 24.");
+    if (["T1", "T2", "T3"].includes(values.I) && (!values.L || !Number.isFinite(+values.L) || +values.L <= 0 || +values.L > 24)) throw Error("Enter hours above 0, up to 24.");
     if (!/^[0-5]$/.test(values.P)) throw Error("Choose a work level.");
   }
   if (sheet === "Case Register" && !Object.keys(timeNames).includes(values.N)) throw Error("Choose a time class.");
   if (sheet === "Competency Evidence") {
     if (!/^[0-5]$/.test(values.J)) throw Error("Choose a work level.");
     const skill = data.sheets["Competency Catalog"].rows.find((r) => r.values.A === values.E);
-    if (!skill || skill.values.C !== values.F) throw Error("Choose a skill from the uploaded catalog.");
+    if (!skill || skill.values.C !== values.F) throw Error("Choose a skill from the Competency Catalog.");
     const proofIds = values.H.split(/[,;\s]+/).filter(Boolean), known = rowsFor(data, edits, "Evidence Index");
-    if (proofIds.some((id) => !known.some((r) => r.values.A === id && r.values.B === values.B))) throw Error("Every proof ID must belong to the selected case.");
+    if (proofIds.some((id) => !known.some((r) => r.values.A === id && r.values.B === values.B))) throw Error("Choose proof from this case only.");
   }
   return current;
 }
@@ -7698,14 +7698,14 @@ var xml = (b) => new import_xmldom.DOMParser().parseFromString(strFromU8(b), "ap
 var els = (e, name) => Array.from(e.getElementsByTagNameNS("*", name));
 var text = (e) => e?.textContent ?? "";
 function unpack(bytes) {
-  if (bytes.length > 30 * 1024 * 1024) throw Error("Upload a casebook smaller than 30 MB.");
+  if (bytes.length > 30 * 1024 * 1024) throw Error("Casebooks must be smaller than 30 MB.");
   let expanded = 0;
   const files = unzipSync(bytes, { filter: (f) => {
     expanded += f.originalSize;
-    if (expanded > 120 * 1024 * 1024) throw Error("Workbook contents exceed 120 MB.");
+    if (expanded > 120 * 1024 * 1024) throw Error("This casebook is too large to open.");
     return true;
   } });
-  if (!files["xl/workbook.xml"] || !files["xl/_rels/workbook.xml.rels"]) throw Error("Upload an unencrypted .xlsx workbook.");
+  if (!files["xl/workbook.xml"] || !files["xl/_rels/workbook.xml.rels"]) throw Error("This is not a usable .xlsx workbook. If it has a password, remove it in Excel and import again.");
   return files;
 }
 function paths(files) {
@@ -7863,10 +7863,10 @@ async function call(cfg, path3, init = {}) {
     throw new KimaiError("Kimai is not reachable right now.");
   }
   const text2 = await r.text();
-  if (r.status === 401 || r.status === 403) throw new KimaiError("Kimai did not accept this API token.", r.status);
+  if (r.status === 401 || r.status === 403) throw new KimaiError("Kimai did not accept your API token. Create a new one in Kimai and connect again.", r.status);
   if (r.status >= 500 || !(r.headers.get("content-type") ?? "").includes("json") && text2) throw new KimaiError("Kimai is not reachable right now.", r.status);
   if (!r.ok) {
-    let message = `Kimai said no (${r.status}).`;
+    let message = `Kimai rejected the change (error ${r.status}).`;
     try {
       const e = JSON.parse(text2);
       message = e.message ?? message;
@@ -7984,7 +7984,7 @@ async function saveEntry(b, owner, sheet, row, values, source) {
     db().prepare("UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?").bind(JSON.stringify(edits), timestamp, b.id, owner, b.revision),
     db().prepare("INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(), b.id, owner, revision, JSON.stringify({ sheet, row, before: old, after: updated, cascades, ...source ? { source } : {} }), timestamp)
   ]);
-  if (results[0].meta.changes !== 1) throw json({ error: "Another update arrived first. Reload before saving." }, 409);
+  if (results[0].meta.changes !== 1) throw json({ error: "This casebook changed in another window. It is up to date now, so check the form and save again." }, 409);
   b.revision = revision;
   b.edits = JSON.stringify(edits);
   b.updated = timestamp;
@@ -8003,7 +8003,7 @@ async function deleteEntry(b, owner, sheet, row, source) {
     db().prepare("UPDATE casebooks SET edits=?,revision=revision+1,updated=? WHERE id=? AND owner=? AND revision=?").bind(JSON.stringify(edits), timestamp, b.id, owner, b.revision),
     db().prepare("INSERT INTO casebook_events (id,book_id,actor,revision,detail,created) SELECT ?,?,?,?,?,? WHERE changes()=1").bind(crypto.randomUUID(), b.id, owner, revision, JSON.stringify({ sheet, row, before: current.values, after: cleared, deleted: true, ...source ? { source } : {} }), timestamp)
   ]);
-  if (results[0].meta.changes !== 1) throw json({ error: "Another update arrived first. Reload before deleting." }, 409);
+  if (results[0].meta.changes !== 1) throw json({ error: "This casebook changed in another window. Reload the page, then try again." }, 409);
   b.revision = revision;
   b.edits = JSON.stringify(edits);
   b.updated = timestamp;
@@ -8245,7 +8245,7 @@ async function kimaiRoute(path3, method, request, owner) {
       return json({ ok: true });
     }
     const e = await entry(cfg, link.kimai_id);
-    if (!e) throw Error("That Kimai entry no longer exists.");
+    if (!e) throw Error("That entry was deleted in Kimai. Unlink it under Removed in Kimai review.");
     const map = await caseMap(b.id), row = sessionRows(b).find((r) => r.values.A === link.session_id);
     if (body.keep === "kimai") {
       await pullInto(b, owner, row, e);
@@ -8276,12 +8276,12 @@ async function handle(request) {
       }
       if (method === "POST") {
         const count = await db().prepare("SELECT COUNT(*) AS n FROM casebooks WHERE owner=?").bind(owner).first();
-        if (count.n >= 20) throw Error("The pilot supports up to 20 casebooks per person.");
+        if (count.n >= 20) throw Error("You can keep up to 20 casebooks.");
         const form = await request.formData(), file = form.get("file");
         if (!(file instanceof File) || !file.name.toLowerCase().endsWith(".xlsx")) throw Error("Choose a .xlsx casebook.");
         if (file.size > 30 * 1024 * 1024) throw Error("Casebooks must be smaller than 30 MB.");
         const bytes = new Uint8Array(await file.arrayBuffer()), data2 = parseWorkbook(bytes), parsed = JSON.stringify(data2);
-        if (parsed.length > 8e6) throw Error("This casebook contains too much data for the pilot.");
+        if (parsed.length > 8e6) throw Error("This casebook is too large to open.");
         const id = crypto.randomUUID(), key = owner + "/" + id + "/original.xlsx", created = now();
         await bucket().put(key, bytes, { httpMetadata: { contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" } });
         await db().prepare("INSERT INTO casebooks (id,owner,name,original_key,parsed,edits,revision,created,updated) VALUES (?,?,?,?,?,'{}',0,?,?)").bind(id, owner, safeName(file.name), key, parsed, created, created).run();
@@ -8310,7 +8310,7 @@ async function handle(request) {
     if (path3[2] === "entries" && method === "PUT") {
       if (+(request.headers.get("content-length") ?? 0) > 1e5) throw Error("Entry is too large.");
       const body = await request.json();
-      if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload before saving; your form stays open." }, 409);
+      if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. It is up to date now, so check the form and save again." }, 409);
       const { sheet, row, values } = body;
       if (!values || typeof values !== "object") throw Error("Entry fields are missing.");
       const saved = await saveEntry(b, owner, sheet, row, values, body.source === "restore" ? "restore" : void 0);
@@ -8319,17 +8319,18 @@ async function handle(request) {
     }
     if (path3[2] === "entries" && path3[3] === "delete" && method === "POST") {
       const body = await request.json();
-      if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload first." }, 409);
+      if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload the page, then try again." }, 409);
       const r = await deleteEntry(b, owner, body.sheet, +body.row);
       if (body.sheet === "Session Ledger" && r.before.A) await db().prepare("DELETE FROM kimai_links WHERE book_id=? AND session_id=?").bind(b.id, r.before.A).run();
       return json(r);
     }
     if (path3[2] === "files" && method === "POST") {
       const totals = await db().prepare("SELECT SUM(bytes) AS bytes,COUNT(*) AS n FROM proof_files WHERE book_id=?").bind(b.id).first(), form = await request.formData(), f = form.get("file");
-      if (!(f instanceof File)) throw Error("Choose a supporting file.");
-      if (!/\.(pdf|png|jpg|jpeg|webp|txt|md|csv|json|log|pcap|pcapng|conf|yaml|yml|docx|xlsx)$/i.test(f.name)) throw Error("Use a document, image, log, configuration, or packet capture.");
-      if (f.size <= 0 || f.size > 10 * 1024 * 1024) throw Error("Files must be nonempty and no larger than 10 MB.");
-      if ((totals.bytes ?? 0) + f.size > 40 * 1024 * 1024 || totals.n >= 100) throw Error("The pilot allows 100 files and 40 MB of proof per casebook.");
+      if (!(f instanceof File)) throw Error("Choose a file.");
+      if (!/\.(pdf|png|jpg|jpeg|webp|txt|md|csv|json|log|pcap|pcapng|conf|yaml|yml|docx|xlsx)$/i.test(f.name)) throw Error(`${f.name} can't be attached. Use a PDF, image, text, log, config, Word, Excel or packet capture file.`);
+      if (f.size <= 0) throw Error(`${f.name} is empty.`);
+      if (f.size > 10 * 1024 * 1024) throw Error(`${f.name} is over 10 MB.`);
+      if ((totals.bytes ?? 0) + f.size > 40 * 1024 * 1024 || totals.n >= 100) throw Error("A casebook can hold up to 100 proof files (40 MB in all).");
       const bytes = await f.arrayBuffer(), hash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map((n) => n.toString(16).padStart(2, "0")).join(""), id = crypto.randomUUID(), name = safeName(f.name), key = owner + "/" + b.id + "/proof/" + id, created = now();
       await bucket().put(key, bytes);
       await db().prepare("INSERT INTO proof_files (id,book_id,owner,name,object_key,hash,bytes,created) VALUES (?,?,?,?,?,?,?,?)").bind(id, b.id, owner, name, key, hash, f.size, created).run();

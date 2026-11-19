@@ -14,9 +14,9 @@ async function call(cfg:KimaiConfig,path:string,init:RequestInit={}):Promise<{bo
  try{r=await fetch(cfg.url.replace(/\/+$/,'')+path,{...init,headers:{Authorization:`Bearer ${cfg.token}`,Accept:'application/json',...(init.body?{'Content-Type':'application/json'}:{})},signal:AbortSignal.timeout(12000)});}
  catch{throw new KimaiError('Kimai is not reachable right now.');}
  const text=await r.text();
- if(r.status===401||r.status===403)throw new KimaiError('Kimai did not accept this API token.',r.status);
+ if(r.status===401||r.status===403)throw new KimaiError('Kimai did not accept your API token. Create a new one in Kimai and connect again.',r.status);
  if(r.status>=500||!(r.headers.get('content-type')??'').includes('json')&&text)throw new KimaiError('Kimai is not reachable right now.',r.status);
- if(!r.ok){let message=`Kimai said no (${r.status}).`;try{const e=JSON.parse(text);message=e.message??message;}catch{}throw new KimaiError(message,r.status);}
+ if(!r.ok){let message=`Kimai rejected the change (error ${r.status}).`;try{const e=JSON.parse(text);message=e.message??message;}catch{}throw new KimaiError(message,r.status);}
  return {body:text?JSON.parse(text):null,headers:r.headers};
 }
 
