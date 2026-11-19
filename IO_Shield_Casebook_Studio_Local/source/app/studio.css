@@ -365,3 +365,12 @@ body[data-scroll-locked]{margin-right:0!important}
 .steps{margin:8px 0 0 20px;list-style:decimal;font-size:14px;display:grid;gap:4px}
 .case-row.check-row{grid-template-columns:minmax(0,1fr) auto}
 .check-row .case-name{white-space:normal;font-weight:400}
+.skill-head{display:grid;grid-template-columns:118px minmax(140px,2fr) auto minmax(0,2fr);gap:16px;align-items:center;padding:12px 16px;border-top:1px solid var(--border);background:var(--muted);font-size:14px}
+.list>.skill-head:first-child{border-top:0}
+.skill-head .case-name{font-weight:600}
+.skill-level{font-weight:500}
+.skill-next{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+@media(max-width:760px){.skill-head{grid-template-columns:minmax(0,1fr) auto}.skill-head>.mono{display:none}.skill-next{grid-column:1/-1;text-align:left;white-space:normal}}
+.case-row.skill-claim{grid-template-columns:118px minmax(140px,2fr) minmax(0,1fr) 7rem auto auto}
+@media(max-width:760px){.case-row.skill-claim{grid-template-columns:minmax(0,1fr) auto auto}}
+@media(max-width:760px){.skill-head{row-gap:4px}}

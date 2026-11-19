@@ -385,7 +385,7 @@ export default function Studio({displayName}:{displayName:string}){
  view==='case'&&current?CaseView():view==='case'?<div className="empty"><p>No case “{openCase}” in this casebook.</p><Button variant="outline" onClick={()=>go('#/')}>Back to cases</Button></div>:
  view==='skills'?<>
   <div className="heading"><h1>Skills</h1><div className="heading-actions"><div className="search"><Search size={15}/><Input placeholder="Search" aria-label="Search skills" value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={searchKeys}/></div><Button variant="outline" onClick={()=>start(CLAIMS)} disabled={!cases.length}><Plus size={15}/>Claim skill</Button></div></div>
-  {claims.length===0?<div className="empty"><p>No skill claims yet.{!cases.length&&' Start a case first.'}</p><Button variant="outline" onClick={()=>start(CLAIMS)} disabled={!cases.length}><Plus size={15}/>Claim skill</Button></div>:q&&!claims.some(match)?<div className="empty"><p>No skills match “{search}”.</p><Button variant="ghost" onClick={()=>setSearch('')}>Clear search</Button></div>:domains.map(([code,name])=>{const mine=claims.filter(r=>domainCode(r.values.D)===code&&match(r));if(!mine.length)return null;return <section className="group" key={code}><div className="group-head"><h2>{name}</h2></div><div className="list">{mine.map(r=><button key={r.row} className={"case-row"+(landed===r.values.A?" landed":"")} onClick={()=>start(CLAIMS,r)}><span className="mono">{r.values.E}</span><span className="case-name">{r.values.F}</span><span className="muted">{findCase(r.values.B)?.values.C??r.values.B}</span><span className="muted" title="Work level">{levels[+r.values.J]?.slice(4)}</span>{r.values.K?<span className={'badge'+tone(r.values.K)} title="Result">{r.values.K}</span>:<span/>}{rowStatus(r.values.N)}</button>)}</div></section>;})}
+  {claims.length===0?<div className="empty"><p>No skill claims yet.{!cases.length&&' Start a case first.'}</p><Button variant="outline" onClick={()=>start(CLAIMS)} disabled={!cases.length}><Plus size={15}/>Claim skill</Button></div>:q&&!claims.some(match)?<div className="empty"><p>No skills match “{search}”.</p><Button variant="ghost" onClick={()=>setSearch('')}>Clear search</Button></div>:domains.map(([code,name])=>{const mine=claims.filter(r=>domainCode(r.values.D)===code&&match(r));if(!mine.length)return null;return <section className="group" key={code}><div className="group-head"><h2>{name}</h2></div><div className="list">{[...new Set(mine.map(r=>r.values.E))].flatMap(skill=>{const all=claims.filter(r=>r.values.E===skill),pr=skillProgress(all),shown=mine.filter(r=>r.values.E===skill);return [<div key={'h'+skill} className="skill-head"><span className="mono">{skill}</span><span className="case-name">{shown[0].values.F}</span><span className="skill-level">{pr.current>=0?levels[pr.current].slice(4):'No verified demos'}</span><span className="muted skill-next" title={pr.rule?`Needs: ${pr.rule.text}. Reviewer checks: ${pr.rule.check} These are minimums; the reviewer makes the final call.`:undefined}>{pr.target?<>Toward {levels[pr.target].slice(4)}: {pr.parts.join(' · ')}</>:'Top level'}</span></div>,...shown.map(r=><button key={r.row} className={"case-row skill-claim"+(landed===r.values.A?" landed":"")} onClick={()=>start(CLAIMS,r)}><span className="muted num">{excelDate(r.values.C)}</span><span className="case-name">{findCase(r.values.B)?.values.C??r.values.B}</span><span className="muted">{r.values.G}</span><span className="muted" title="Work level">{levels[+r.values.J]?.slice(4)}</span>{r.values.K?<span className={'badge'+tone(r.values.K)} title="Result">{r.values.K}</span>:<span/>}{rowStatus(r.values.N)}</button>)];})}</div></section>;})}
  </>:
  view==='history'?<>
   <div className="heading"><h1>History</h1></div>
@@ -511,6 +511,22 @@ const tutorials=[
  {title:'Import from Kimai',src:'/tutorials/import-kimai.mp4',steps:'On Cases, click Review next to Kimai. Pick the case for an entry and import it as a session.'},
  {title:'Get a Kimai API token',src:'/tutorials/kimai-api-token.mp4',steps:'In Kimai, open your profile menu, choose API access, create a token, and copy it.'},
 ];
+// Will's Advancement Rules (template sheet "Advancement Rules"). Default minimums, not automatic: the reviewer decides.
+const moves:{need:number,minLevel:number,text:string,check:string}[]=[
+ {need:1,minLevel:1,text:'1 verified assisted demo',check:'Person participated and understands purpose/basic steps.'},
+ {need:2,minLevel:1,text:'2 verified demos, separate work sessions',check:'At least one demo completed mostly without constant prompting.'},
+ {need:3,minLevel:2,text:'3 verified demos, 2+ sessions and 2 contexts, at least 1 troubleshooting or recovery event',check:'Clear docs; proof of result; no unresolved scope/safety issue.'},
+ {need:3,minLevel:3,text:'3 additional verified Independent demos, including at least 1 complex or unusual case',check:'Sound decisions; explains tradeoffs; reviews another person or leads bounded activity.'},
+ {need:3,minLevel:4,text:'2 teaching or mentoring demos + 1 review or assessment demo',check:'Teaching accurate; feedback fair; decisions evidence-based; knows when to escalate.'},
+];
+const verified=(v?:string)=>v==='Verified'||v==='Verified w/ Correction';
+function skillProgress(list:Row[]){
+ const ok=list.filter(r=>verified(r.values.N)),current=ok.length?Math.max(...ok.map(r=>+r.values.J||0)):-1,target=Math.max(1,current+1);
+ if(current>=5)return {current,ok:ok.length,target:null as null|number,parts:[] as string[],rule:null as null|typeof moves[0]};
+ const rule=moves[target-1],count=ok.filter(r=>(+r.values.J||0)>=rule.minLevel).length,parts=[`${Math.min(count,rule.need)} of ${rule.need} verified demos`];
+ if(target===3){const ctx=new Set(ok.map(r=>r.values.G).filter(Boolean)).size,fix=ok.some(r=>r.values.L==='Yes'||(r.values.M??'').trim());parts.push(`${Math.min(ctx,2)} of 2 contexts`,fix?'troubleshooting shown':'no troubleshooting yet');}
+ return {current,ok:ok.length,target,parts,rule};
+}
 function Clip({src,label}:{src:string,label:string}){
  const ref=useRef<HTMLVideoElement>(null),[missing,setMissing]=useState(false),still=typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
  const [paused,setPaused]=useState(true);
