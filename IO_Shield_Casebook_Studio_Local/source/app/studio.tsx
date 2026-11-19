@@ -236,7 +236,7 @@ export default function Studio({displayName}:{displayName:string}){
   else{const list=listFor(sheet,col);if(list)options=list.map(v=>[v,v,sheet===CASES&&col==='D'?defs.caseType[v]??'':'']);}
   if(sheet===CLAIMS&&col==='F')return null;
   if(options)return <Field key={col} label={label} required={req}><Choice label={label} options={options} value={label.includes('Domain')||sheet===CLAIMS&&col==='D'?domainCode(value):value} onChange={set}/></Field>;
-  if(wide)return <Field key={col} label={sheet===PORTFOLIO&&col==='M'?'Story':label} required={req} wide><Textarea rows={3} value={value} onChange={e=>set(e.target.value)}/></Field>;
+  if(wide)return <Field key={col} label={sheet===PORTFOLIO&&col==='M'?'Story':label} required={req} wide><Textarea aria-label={sheet===PORTFOLIO&&col==='M'?'Story':label} rows={3} value={value} onChange={e=>set(e.target.value)}/></Field>;
   const date=(dateColumns[sheet]??[]).includes(col);
   if(suggestCols[sheet]?.includes(col))return <Field key={col} label={label} required={req}><SuggestInput label={label} value={value} onChange={set} options={suggestions(sheet,col)}/></Field>;
   return <Field key={col} label={label} required={req}><Input aria-label={label} value={value} type={date?'date':'text'} onChange={e=>set(e.target.value)} readOnly={col==='A'&&form.existing}/></Field>;
@@ -383,7 +383,9 @@ function ConfirmButton({label,confirmLabel,onConfirm,disabled,className='',varia
 }
 function Section({title,count,extra,add,addLabel,children}:{title:string,count:number,extra?:string,add:()=>void,addLabel:string,children:React.ReactNode}){return <section className="group"><div className="group-head"><h2>{title}</h2><span className="muted">{count||''}{extra&&count?` · ${extra}`:''}</span><button className="text-btn" onClick={add}><Plus size={14}/>{addLabel}</button></div>{count>0&&<div className="list">{children}</div>}</section>;}
 function Field({label,required=false,wide=false,group=false,children}:{label:string,required?:boolean,wide?:boolean,group?:boolean,children:React.ReactNode}){
- const Tag=group?'div':'label',tip=fieldTips[label];
+ // With a definition, the "?" button must sit outside the <label>, or its text joins the field's accessible name.
+ // Every control passes its own aria-label, so a plain wrapper is fine then.
+ const tip=fieldTips[label],Tag=group||tip?'div':'label';
  const text=<>{label}{required&&<><b aria-hidden="true"> *</b><span className="sr-only"> (required)</span></>}</>;
- return <Tag className={'field '+(wide?'wide':'')}>{tip?<span className="field-label">{text}<Tooltip><TooltipTrigger asChild><button type="button" className="tip-btn" aria-label={`About ${label}: ${tip}`} onClick={e=>e.preventDefault()}>?</button></TooltipTrigger><TooltipContent side="top" className="max-w-64">{tip}</TooltipContent></Tooltip></span>:<span>{text}</span>}{children}</Tag>;
+ return <Tag className={'field '+(wide?'wide':'')}>{tip?<span className="field-label"><span>{text}</span><Tooltip><TooltipTrigger asChild><button type="button" className="tip-btn" aria-label="Show definition">?</button></TooltipTrigger><TooltipContent side="top" className="max-w-64">{tip}</TooltipContent></Tooltip></span>:<span>{text}</span>}{children}</Tag>;
 }

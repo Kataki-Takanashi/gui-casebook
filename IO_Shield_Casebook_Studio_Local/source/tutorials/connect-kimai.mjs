@@ -8,7 +8,7 @@ try{
  await click(page,page.locator('.book-menu'));
  await caption(page,'Choose Kimai');
  await click(page,page.getByRole('button',{name:'Kimai',exact:true}));
- const dialog=page.getByRole('dialog');
+ const dialog=page.locator('[role=dialog].entry-dialog').first();
  await dialog.waitFor();
  await caption(page,'Enter your Kimai address');
  const address=dialog.getByLabel('Kimai address');

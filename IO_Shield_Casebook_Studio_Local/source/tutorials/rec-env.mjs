@@ -47,11 +47,13 @@ async function seedCases(){
   await page.getByRole('button',{name:'New case'}).first().click();
   await page.getByLabel('Case / Project').fill(title);
   await pick('Type',type);
+  // New cases don't guess a domain, so pick one.
+  await page.getByRole('combobox',{name:'Main Domain'}).click();await page.getByRole('option').filter({hasText:'Networking'}).first().click();
   if(parent){await page.getByRole('combobox',{name:'Parent project'}).click();await page.getByRole('option').filter({hasText:parent}).first().click();}
   await page.getByLabel('What I Did').fill(did);
   await page.getByLabel('Scope / Permission').fill('Own lab equipment');
   await page.getByRole('button',{name:'Save',exact:true}).click();
-  await page.getByRole('dialog').waitFor({state:'detached'});
+  await page.locator('[role=dialog].entry-dialog').first().waitFor({state:'detached'});
  };
  await newCase('Lab Network Build','Parent Project','Built a small lab network to practice on.');
  await newCase('Network Inventory','Project Case','Listed every device on the lab network.','Lab Network Build');
@@ -65,7 +67,7 @@ async function seedCases(){
  await page.getByLabel('Start',{exact:true}).fill('19:00');
  await page.getByLabel('End',{exact:true}).fill('20:30');
  await page.getByRole('button',{name:'Save',exact:true}).click();
- await page.getByRole('dialog').waitFor({state:'detached'});
+ await page.locator('[role=dialog].entry-dialog').first().waitFor({state:'detached'});
  await page.waitForTimeout(500);
  await browser.close();
 }

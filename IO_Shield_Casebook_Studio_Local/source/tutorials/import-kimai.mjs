@@ -11,7 +11,7 @@ try{
  await hold(page,500);
  await caption(page,'Click Review');
  await click(page,bar.getByRole('button',{name:'Review'}));
- const dialog=page.getByRole('dialog');
+ const dialog=page.locator('[role=dialog].entry-dialog').first();
  await dialog.getByText('New in Kimai').waitFor();
  await caption(page,'Pick the case, then Import');
  await hold(page,500);

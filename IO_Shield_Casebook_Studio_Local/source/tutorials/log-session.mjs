@@ -9,7 +9,7 @@ try{
  await moveTo(page,row);
  await row.hover();
  await click(page,row.locator('.row-action'));
- const dialog=page.getByRole('dialog');
+ const dialog=page.locator('[role=dialog].entry-dialog').first();
  await dialog.getByText('Log session').first().waitFor();
  await caption(page,'Say what you worked on');
  await type(page,dialog.getByLabel('What I Worked On'),'Labeled patch panel');
