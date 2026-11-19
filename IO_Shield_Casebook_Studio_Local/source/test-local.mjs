@@ -27,5 +27,9 @@ try{
  const hostileHostStatus=await new Promise((resolve,reject)=>{const request=http.request(base+'/api/books',{headers:{Host:'outside.example'}},response=>{response.resume();resolve(response.statusCode);});request.on('error',reject);request.end();});assert.equal(hostileHostStatus,403);
  await stop();await start();r=await get('/api/books/'+id);book=await r.json();assert.equal(book.revision,1);assert.equal(book.files[0].name,'local-proof.txt');assert.equal(book.edits['Case Register']['53'].C,'Local persistence test');
  r=await get('/api/files/'+f.id);assert.equal(await r.text(),'Local test proof');
- console.log(JSON.stringify({passed:true,mode:'standalone localhost',checks:14,sheets:23,restartPersistence:true,proofStoredOnDisk:true,externalOriginsRejected:true}));
+ // Odd hours, dates and times are refused, so the exported workbook stays valid in Excel.
+ const session={A:'LOCAL-TEST-001-S001',B:'2026-10-02',C:'LOCAL-TEST-001',D:'Session test',E:'Practical',F:'Training',G:'01',I:'T1',J:'18:00',K:'19:00',L:'1',P:'1'};
+ for(const bad of [{L:'0x10'},{L:'1e1'},{B:'0001-01-01'},{J:'banana'},{K:'25:99'}]){r=await get(`/api/books/${id}/entries`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet:'Session Ledger',row:5,revision:1,values:{...session,...bad}})});assert.equal(r.status,400,JSON.stringify(bad));}
+ r=await get(`/api/books/${id}/entries`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet:'Session Ledger',row:5,revision:1,values:session})});assert.equal(r.status,200,await r.clone().text());
+ console.log(JSON.stringify({passed:true,mode:'standalone localhost',checks:15,sheets:23,restartPersistence:true,proofStoredOnDisk:true,externalOriginsRejected:true}));
 }finally{if(child&&child.exitCode===null)await stop();fs.rmSync(temp,{recursive:true,force:true});}
