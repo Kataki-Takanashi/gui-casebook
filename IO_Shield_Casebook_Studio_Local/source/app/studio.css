@@ -265,3 +265,10 @@ kbd{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;paddi
 .sticky-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 2px;margin-top:8px;background:var(--popover);border-top:1px solid var(--border)}
 .primary-confirm:not(:disabled):not(.armed){border-color:var(--primary);color:var(--primary)}
 [data-collapsible=icon] [data-sidebar=menu-button][data-active=true]{background:var(--accent);color:var(--accent-foreground)}
+
+/* Round 5 fixes */
+body[data-scroll-locked]{margin-right:0!important}
+.review-group-head{position:sticky;top:0;z-index:2;background:var(--popover);padding:6px 2px}
+.sticky-bar{padding:10px 2px 12px}
+.tip-pop{width:auto;max-width:260px;padding:8px 10px;font-size:13px}
+@media(max-width:760px){.form-row.times{grid-template-columns:1fr 1fr!important}}

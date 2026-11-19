@@ -39,6 +39,18 @@ try{
  await page.getByRole('button',{name:'Cancel'}).click();await page.getByRole('button',{name:'Discard'}).click();await page.waitForTimeout(500);
  check('Discard closes the form',!(await dialogOpen()));
  check('Page is clickable after discarding',!(await pageLocked()));
+ // Fast Escape sequence: a dropdown, then a picker, in the same form.
+ await page.getByRole('heading',{name:'Cases'}).waitFor();
+ await page.locator('button.case-name').first().click();await page.getByRole('button',{name:'Add proof'}).click();await page.locator('[role=dialog].entry-dialog').waitFor();
+ await page.getByRole('combobox',{name:'Proof Type'}).click();await page.locator('[data-slot=select-content]').waitFor();await page.keyboard.press('Escape');
+ await page.getByRole('combobox',{name:'Case',exact:true}).click();await page.keyboard.press('Escape');await page.waitForTimeout(500);
+ check('Fast Escapes keep the form open',await dialogOpen());
+ // The form itself must still respond (the page behind a modal form is meant to ignore clicks).
+ await page.getByRole('textbox',{name:'What It Shows'}).fill('still works',{timeout:3000}).then(()=>check('Form still responds after fast Escapes',true),()=>check('Form still responds after fast Escapes',false));
+ await page.getByRole('button',{name:'Cancel'}).click({timeout:3000}).catch(()=>{});await page.waitForTimeout(400);
+ if(await dialogOpen())await page.getByRole('button',{name:'Discard'}).click({timeout:3000}).catch(()=>{});
+ await page.waitForTimeout(500);
+ check('Page is clickable after closing that form',!(await dialogOpen())&&!(await pageLocked()));
  // Escape on a dropdown inside the Kimai dialog (if Kimai is connected) closes only the dropdown.
  const mapSelect=async()=>{await page.getByRole('button',{name:'Casebook menu'}).click();await page.locator('.menu-item').filter({hasText:'Kimai'}).click();await page.locator('[role=dialog].entry-dialog').waitFor();return page.getByRole('combobox',{name:/Kimai activity for/}).first();};
  const sel=await mapSelect();
