@@ -112,7 +112,7 @@ button.case-row:hover,div.case-row:hover{background:var(--muted)}
 .suggest{position:relative}
 .suggest-list{position:absolute;z-index:20;top:calc(100% + 4px);left:0;right:0;background:var(--popover);border:1px solid var(--border);border-radius:7px;box-shadow:0 6px 20px #0001;padding:4px;max-height:220px;overflow:auto}
 .suggest-list button{display:block;width:100%;text-align:left;padding:6px 9px;border-radius:5px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.suggest-list button:hover{background:var(--muted)}
+.suggest-list button:hover,.suggest-list button.active{background:var(--muted)}
 .history-diff{display:grid;gap:6px;padding:10px 16px 14px;background:var(--muted);font-size:13px}
 .history-diff>div{display:grid;grid-template-columns:140px 1fr;gap:12px}
 .history-diff span:last-child{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -281,3 +281,11 @@ body[data-scroll-locked]{margin-right:0!important}
 .help-dialog .clip{max-height:calc(100dvh - 240px);object-fit:contain;width:100%}
 [data-slot=select-value]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:block}
 [data-slot=select-trigger]{min-width:0}
+
+/* Focus moved to the page heading on navigation is for screen readers; no ring. */
+main h1:focus{outline:none}
+/* A closing menu must not take clicks during its fade-out. */
+[data-slot=select-content][data-state=closed],[data-slot=popover-content][data-state=closed]{pointer-events:none}
+.clip-wrap{position:relative}
+.clip-toggle{position:absolute;right:10px;bottom:10px;display:grid;place-items:center;width:32px;height:32px;border-radius:999px;background:color-mix(in oklab,var(--background) 85%,transparent);border:1px solid var(--border);color:var(--foreground)}
+.clip-toggle:hover{background:var(--background)}

@@ -29,6 +29,19 @@ try{
  check('Escape closes an untouched form',!(await dialogOpen()));
  check('Page is clickable after closing',!(await pageLocked()));
 
+ // A fast double Escape on a dropdown closes only the dropdown.
+ await openLogSession();
+ await page.getByRole('combobox',{name:'Time Class'}).click();await page.locator('[data-slot=select-content]').waitFor();
+ await page.keyboard.press('Escape');await page.keyboard.press('Escape');await page.waitForTimeout(400);
+ check('Double Escape on a dropdown keeps the form open',await dialogOpen());
+ await page.keyboard.press('Escape');await page.waitForTimeout(500);
+
+ // Closing a dialog puts focus back on the button that opened it.
+ await page.getByRole('button',{name:/^Log session/}).first().focus();await page.keyboard.press('Enter');
+ await page.locator('[role=dialog].entry-dialog').waitFor();await page.waitForTimeout(300);
+ await page.keyboard.press('Escape');await page.waitForTimeout(600);
+ check('Focus returns to Log session after closing',await page.evaluate(()=>/^Log session/.test(document.activeElement?.textContent??'')));
+
  // Escape on an open definition closes only the definition.
  await openLogSession();await page.waitForTimeout(300);
  check('Log session starts in What I Worked On',await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')==='What I Worked On'));

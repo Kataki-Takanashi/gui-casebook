@@ -63,7 +63,8 @@ const same=(a:K.SyncFields,b:K.SyncFields)=>a.date===b.date&&a.start===b.start&&
 const sinceDate=()=>new Date(Date.now()-WINDOW_DAYS*86400000).toISOString().slice(0,10);
 function sessionRows(b:any){return rowsFor(JSON.parse(b.parsed),JSON.parse(b.edits),SESSIONS);}
 function appFields(row:any,map:Record<string,{project:number,activity:number}>,fallback?:K.SyncFields):K.SyncFields|null{
- const v=row.values,target=map[v.C]??(fallback&&{project:fallback.project,activity:fallback.activity});
+ // A linked session keeps its Kimai activity; a new one uses the activity picked in the form, else the case's.
+ const v=row.values,target=fallback?{project:fallback.project,activity:fallback.activity}:map[v.C];
  const date=excelDate(v.B),start=clockTime(v.J),end=clockTime(v.K);
  if(!target||!date||!start||!end)return null;
  return {date,start,end,description:v.D??'',project:target.project,activity:target.activity};
@@ -103,7 +104,7 @@ async function kimaiStatus(b:any,owner:string,apply:boolean){
  return {connected:true,user:await setting('kimai_user'),synced:apply?syncedAt:await setting('kimai_synced_'+b.id),pulled,pushed,new:fresh,to_send:toSend,conflicts,missing,map,linked:[...linkedSessions],cases:cases.filter((c:any)=>c.values.D!=='Parent Project').map((c:any)=>({id:c.values.A,name:c.values.C}))};
 }
 // Called after a session is saved from the form: keep a linked Kimai entry in step, or create one if asked.
-async function afterSessionSave(b:any,sessionId:string,create:boolean){
+async function afterSessionSave(b:any,sessionId:string,create:boolean,pick?:{project:number,activity:number}){
  const cfg=await kimaiConfig();if(!cfg)return undefined;
  try{
   const row=sessionRows(b).find((r:any)=>r.values.A===sessionId),map=await caseMap(b.id),link=(await links(b.id)).find(l=>l.session_id===sessionId);
@@ -112,7 +113,7 @@ async function afterSessionSave(b:any,sessionId:string,create:boolean){
    if(!same(K.entryFields(remote),link.synced.kimai))return {status:'conflict'};
    const u=await K.update(cfg,link.kimai_id,app);await saveLink(b.id,sessionId,link.kimai_id,app,K.entryFields(u));return {status:'updated'};}
   if(!create)return undefined;
-  const app=appFields(row,map);if(!app)return {status:'unmapped'};
+  const app=appFields(row,pick?{...map,[row.values.C]:pick}:map);if(!app)return {status:'unmapped'};
   const e=await K.create(cfg,app);await saveLink(b.id,sessionId,e.id,app,K.entryFields(e));return {status:'created',kimai_id:e.id};
  }catch(e){return {status:'error',error:(e as Error).message};}
 }
@@ -211,7 +212,7 @@ async function handle(request:Request){try{
   if(+(request.headers.get('content-length')??0)>100000)throw Error('Entry is too large.');const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload before saving; your form stays open.'},409);
   const {sheet,row,values}=body;if(!values||typeof values!=='object')throw Error('Entry fields are missing.');
   const saved=await saveEntry(b,owner,sheet,row,values,body.source==='restore'?'restore':undefined);
-  const kimai=sheet==='Session Ledger'?await afterSessionSave(b,values.A,!!body.kimai):undefined;
+  const kimai=sheet==='Session Ledger'?await afterSessionSave(b,values.A,!!body.kimai,body.kimai?.activity?{project:+body.kimai.project,activity:+body.kimai.activity}:undefined):undefined;
   return json({...saved,kimai});
  }
  if(path[2]==='entries'&&path[3]==='delete'&&method==='POST'){

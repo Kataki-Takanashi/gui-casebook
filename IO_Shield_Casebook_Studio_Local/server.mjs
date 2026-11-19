@@ -8039,7 +8039,7 @@ function sessionRows(b) {
   return rowsFor(JSON.parse(b.parsed), JSON.parse(b.edits), SESSIONS);
 }
 function appFields(row, map, fallback) {
-  const v = row.values, target = map[v.C] ?? (fallback && { project: fallback.project, activity: fallback.activity });
+  const v = row.values, target = fallback ? { project: fallback.project, activity: fallback.activity } : map[v.C];
   const date = excelDate(v.B), start = clockTime(v.J), end = clockTime(v.K);
   if (!target || !date || !start || !end) return null;
   return { date, start, end, description: v.D ?? "", project: target.project, activity: target.activity };
@@ -8109,7 +8109,7 @@ async function kimaiStatus(b, owner, apply) {
   if (apply) await setSetting("kimai_synced_" + b.id, syncedAt);
   return { connected: true, user: await setting("kimai_user"), synced: apply ? syncedAt : await setting("kimai_synced_" + b.id), pulled, pushed, new: fresh, to_send: toSend, conflicts, missing, map, linked: [...linkedSessions], cases: cases.filter((c) => c.values.D !== "Parent Project").map((c) => ({ id: c.values.A, name: c.values.C })) };
 }
-async function afterSessionSave(b, sessionId, create2) {
+async function afterSessionSave(b, sessionId, create2, pick) {
   const cfg = await kimaiConfig();
   if (!cfg) return void 0;
   try {
@@ -8125,7 +8125,7 @@ async function afterSessionSave(b, sessionId, create2) {
       return { status: "updated" };
     }
     if (!create2) return void 0;
-    const app = appFields(row, map);
+    const app = appFields(row, pick ? { ...map, [row.values.C]: pick } : map);
     if (!app) return { status: "unmapped" };
     const e = await create(cfg, app);
     await saveLink(b.id, sessionId, e.id, app, entryFields(e));
@@ -8314,7 +8314,7 @@ async function handle(request) {
       const { sheet, row, values } = body;
       if (!values || typeof values !== "object") throw Error("Entry fields are missing.");
       const saved = await saveEntry(b, owner, sheet, row, values, body.source === "restore" ? "restore" : void 0);
-      const kimai = sheet === "Session Ledger" ? await afterSessionSave(b, values.A, !!body.kimai) : void 0;
+      const kimai = sheet === "Session Ledger" ? await afterSessionSave(b, values.A, !!body.kimai, body.kimai?.activity ? { project: +body.kimai.project, activity: +body.kimai.activity } : void 0) : void 0;
       return json({ ...saved, kimai });
     }
     if (path3[2] === "entries" && path3[3] === "delete" && method === "POST") {
