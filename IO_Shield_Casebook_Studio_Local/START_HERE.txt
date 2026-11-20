@@ -59,6 +59,12 @@ The last 14 days are kept. Casebook menu > Backups shows them and has Back up no
 To go back to one: close the app, copy that day's casebooks.sqlite and objects
 folder into the data folder (replacing what is there), and start the app again.
 
+REVIEWER MODE (WILL ONLY)
+Reviewer mode is only offered on the reviewer's own copy. To turn it on, put a
+file named reviewer.txt containing your name in the data folder, and restart
+the app. Casebook menu > Reviewer mode then adds a Review page. Analysts' copies
+don't have this file, so they never see it.
+
 SCRIPTS AND AGENTS
 The app has a local API with no token, on this computer only. Every change it
 makes shows in History and can be undone. See API.md.

@@ -6,6 +6,9 @@ import {GET,POST,PUT} from '../app/api/[...path]/route.ts';
 import {appRoot,dataRoot,closeStorage,backup,listBackups} from './storage.mjs';
 const [major,minor]=process.versions.node.split('.').map(Number);if(major<22||major===22&&minor<13)throw Error('Install Node.js 22.13 or newer to run Casebook Studio.');
 const port=Number(process.env.CASEBOOK_PORT||8765);
+// Reviewer mode is only offered on the reviewer's own copy: a reviewer.txt file in the data folder (holding his name),
+// or CASEBOOK_REVIEWER set at launch. Analysts' copies never show it.
+{const f=path.join(dataRoot,'reviewer.txt');if(!process.env.CASEBOOK_REVIEWER&&fs.existsSync(f))process.env.CASEBOOK_REVIEWER=fs.readFileSync(f,'utf8').trim().slice(0,80);}
 if(!Number.isInteger(port)||port<1024||port>65535)throw Error('CASEBOOK_PORT must be between 1024 and 65535.');
 const origin=`http://127.0.0.1:${port}`;
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.json':'application/json','.mp4':'video/mp4'};
@@ -38,10 +41,10 @@ async function respond(req,res){
    if(start>end||start>=size){res.writeHead(416,{'Content-Range':`bytes */${size}`,...security});return res.end();}
    res.writeHead(206,{...headers,'Content-Range':`bytes ${start}-${end}/${size}`,'Content-Length':end-start+1});if(req.method==='HEAD')return res.end();return fs.createReadStream(filename,{start,end}).pipe(res);}
   res.writeHead(200,{...headers,'Content-Length':size});if(req.method==='HEAD')return res.end();fs.createReadStream(filename).pipe(res);
- }catch(e){console.error('Local request failed:',e);if(!res.headersSent)res.writeHead(500,{'Content-Type':'application/json',...security});res.end(JSON.stringify({error:'Local request failed. Check the console; your previous saved data is retained.'}));}
+ }catch(e){if(e?.code==='ECONNRESET'||req.destroyed)return;console.error('Local request failed:',e);if(!res.headersSent)res.writeHead(500,{'Content-Type':'application/json',...security});res.end(JSON.stringify({error:'Local request failed. Check the console; your previous saved data is retained.'}));}
 }
 // Writes run one at a time (the revision check relies on it); reads and page files don't wait behind a slow Kimai call.
-const server=http.createServer((req,res)=>{if(req.method==='GET'||req.method==='HEAD'){respond(req,res).catch(e=>console.error(e));return;}queue=queue.then(()=>respond(req,res)).catch(e=>console.error(e));});
+const server=http.createServer((req,res)=>{if(req.method==='GET'||req.method==='HEAD'){respond(req,res).catch(e=>console.error(e));return;}queue=queue.then(()=>Promise.race([respond(req,res),new Promise(r=>setTimeout(r,60000))])).catch(e=>console.error(e));});
 server.on('error',e=>{if(e.code==='EADDRINUSE')console.error('Port '+port+' is in use. Another Casebook Studio window may already be running.');else console.error(e);process.exitCode=1;closeStorage();});
 // Back up once a day: at start, and every hour after that if the day has changed.
 const dailyBackup=()=>{try{backup();}catch(e){console.error('Backup failed:',e.message);}};setInterval(dailyBackup,3600000).unref();

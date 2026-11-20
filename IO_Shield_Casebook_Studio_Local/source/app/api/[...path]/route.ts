@@ -34,6 +34,7 @@ async function saveEntry(b:any,owner:string,sheet:string,row:number,values:Recor
  return {revision,edits,updated:timestamp};
 }
 
+const reviewerEnv=()=>((globalThis as any).process?.env?.CASEBOOK_REVIEWER as string|undefined)||'';
 // Reviewer decision on a skill claim or portfolio story: only the review columns change, and it is logged (and undoable) like any edit.
 const REVIEW:Record<string,{statuses:string[],status:string,reviewer:string,date?:string}>={
  'Competency Evidence':{statuses:['Pending Review','Verified','Verified w/ Correction','Rejected'],status:'N',reviewer:'O',date:'P'},
@@ -221,6 +222,7 @@ async function handle(request:Request){try{
   if(method==='PUT'){const body:any=await request.json();if(body.start&&isNaN(Date.parse(body.start)))throw Error('Invalid start time.');await setSetting('timer_start',body.start||null);await setSetting('timer_case',body.start&&body.case?String(body.case):null);}
   return json({start:(await setting('timer_start'))??null,case:(await setting('timer_case'))??null});
  }
+ if(path[0]==='settings'&&path[1]==='reviewer'&&method==='GET')return json({name:reviewerEnv()||null});
  if(path[0]==='settings'&&path[1]==='limits'){
   if(method==='PUT'){const body:any=await request.json();for(const k of Object.keys(LIMIT_DEFAULTS) as (keyof typeof LIMIT_DEFAULTS)[]){const v=Math.round(+body[k]);if(!(v>=1&&v<=LIMIT_MAX[k]))throw Error(`Enter a number from 1 to ${LIMIT_MAX[k]}.`);await setSetting('limit_'+k,String(v));}}
   return json({...await limits(),max:LIMIT_MAX});
@@ -269,7 +271,7 @@ async function handle(request:Request){try{
  if(path[2]==='files'&&path[3]==='forget'&&method==='POST'){const body:any=await request.json(),proofRows=rowsFor(JSON.parse(b.parsed),JSON.parse(b.edits),'Evidence Index');let removed=0;
   for(const id of (body.ids??[]).map(String).slice(0,50)){if(proofRows.some((r:any)=>(r.values.F??'').includes(id)))continue;const f=await db().prepare('SELECT object_key FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).first();if(!f)continue;await bucket().delete(f.object_key);await db().prepare('DELETE FROM proof_files WHERE id=? AND book_id=?').bind(id,b.id).run();removed++;}
   return json({removed});}
- if(path[2]==='review'&&method==='POST'){const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload the page, then try again.'},409);return json(await reviewEntry(b,owner,body.sheet,+body.row,String(body.status),String(body.reviewer??'')));}
+ if(path[2]==='review'&&method==='POST'){const body:any=await request.json();if(body.revision!==b.revision)return json({error:'This casebook changed in another window. Reload the page, then try again.'},409);const name=reviewerEnv();if(!name)return json({error:'Reviewing is only available on the reviewer\'s copy of the app.'},403);return json(await reviewEntry(b,owner,body.sheet,+body.row,String(body.status),name));}
  // Read one sheet's records with app edits applied, for scripts.
  if(path[2]==='records'&&path[3]&&method==='GET'){const sheet=decodeURIComponent(path[3]);if(!data.sheets[sheet])throw Error('Unknown sheet.');return json({sheet,revision:b.revision,records:rowsFor(data,edits,sheet)});}
  if(path[2]==='history'&&method==='GET'){const r=await db().prepare('SELECT revision,detail,created FROM casebook_events WHERE book_id=? ORDER BY revision DESC LIMIT 100').bind(b.id).all();return json(r.results);}

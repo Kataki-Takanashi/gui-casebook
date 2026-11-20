@@ -8039,6 +8039,7 @@ async function saveEntry(b, owner, sheet, row, values, source) {
   b.updated = timestamp;
   return { revision, edits, updated: timestamp };
 }
+var reviewerEnv = () => globalThis.process?.env?.CASEBOOK_REVIEWER || "";
 var REVIEW = {
   "Competency Evidence": { statuses: ["Pending Review", "Verified", "Verified w/ Correction", "Rejected"], status: "N", reviewer: "O", date: "P" },
   "Portfolio": { statuses: ["Pending Review", "Approved", "Do Not Publish"], status: "J", reviewer: "K" }
@@ -8365,6 +8366,7 @@ async function handle(request) {
       }
       return json({ start: await setting("timer_start") ?? null, case: await setting("timer_case") ?? null });
     }
+    if (path3[0] === "settings" && path3[1] === "reviewer" && method === "GET") return json({ name: reviewerEnv() || null });
     if (path3[0] === "settings" && path3[1] === "limits") {
       if (method === "PUT") {
         const body = await request.json();
@@ -8467,7 +8469,9 @@ async function handle(request) {
     if (path3[2] === "review" && method === "POST") {
       const body = await request.json();
       if (body.revision !== b.revision) return json({ error: "This casebook changed in another window. Reload the page, then try again." }, 409);
-      return json(await reviewEntry(b, owner, body.sheet, +body.row, String(body.status), String(body.reviewer ?? "")));
+      const name = reviewerEnv();
+      if (!name) return json({ error: "Reviewing is only available on the reviewer's copy of the app." }, 403);
+      return json(await reviewEntry(b, owner, body.sheet, +body.row, String(body.status), name));
     }
     if (path3[2] === "records" && path3[3] && method === "GET") {
       const sheet = decodeURIComponent(path3[3]);
@@ -8509,6 +8513,10 @@ var PUT = handle;
 var [major, minor] = process.versions.node.split(".").map(Number);
 if (major < 22 || major === 22 && minor < 13) throw Error("Install Node.js 22.13 or newer to run Casebook Studio.");
 var port = Number(process.env.CASEBOOK_PORT || 8765);
+{
+  const f = path2.join(dataRoot, "reviewer.txt");
+  if (!process.env.CASEBOOK_REVIEWER && fs2.existsSync(f)) process.env.CASEBOOK_REVIEWER = fs2.readFileSync(f, "utf8").trim().slice(0, 80);
+}
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error("CASEBOOK_PORT must be between 1024 and 65535.");
 var origin = `http://127.0.0.1:${port}`;
 var types = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json", ".mp4": "video/mp4" };
@@ -8589,6 +8597,7 @@ async function respond(req, res) {
     if (req.method === "HEAD") return res.end();
     fs2.createReadStream(filename).pipe(res);
   } catch (e) {
+    if (e?.code === "ECONNRESET" || req.destroyed) return;
     console.error("Local request failed:", e);
     if (!res.headersSent) res.writeHead(500, { "Content-Type": "application/json", ...security });
     res.end(JSON.stringify({ error: "Local request failed. Check the console; your previous saved data is retained." }));
@@ -8599,7 +8608,7 @@ var server = http.createServer((req, res) => {
     respond(req, res).catch((e) => console.error(e));
     return;
   }
-  queue = queue.then(() => respond(req, res)).catch((e) => console.error(e));
+  queue = queue.then(() => Promise.race([respond(req, res), new Promise((r) => setTimeout(r, 6e4))])).catch((e) => console.error(e));
 });
 server.on("error", (e) => {
   if (e.code === "EADDRINUSE") console.error("Port " + port + " is in use. Another Casebook Studio window may already be running.");
