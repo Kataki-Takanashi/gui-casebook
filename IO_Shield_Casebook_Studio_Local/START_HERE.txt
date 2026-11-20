@@ -21,6 +21,7 @@ or newer from https://nodejs.org/en/download. The launchers use it
 automatically when there is no runtime folder.
 
 USING YOUR CASEBOOK
+The full user guide is GUIDE.md. The short version:
 - Drop your casebook .xlsx on the start page, or use the casebook menu
   (top right) > Import casebook.
 - No casebook yet? Ask Will for the Field School casebook .xlsx.
